@@ -13,9 +13,10 @@ export function LandingNav() {
           <span className="text-sm font-semibold tracking-tight">Cadence</span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-          <a href="#features" className="hover:text-foreground">Features</a>
-          <a href="#how" className="hover:text-foreground">How it works</a>
-          <a href="#pricing" className="hover:text-foreground">Pricing</a>
+          <Link to="/book" className="hover:text-foreground">Book</Link>
+          <Link to="/dashboard" className="hover:text-foreground">Dashboard</Link>
+          <Link to="/calendar" className="hover:text-foreground">Calendar</Link>
+          <Link to="/settings" className="hover:text-foreground">Settings</Link>
         </nav>
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm">

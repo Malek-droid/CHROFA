@@ -13,7 +13,7 @@ export const Route = createFileRoute("/dashboard/settings")({
   component: SettingsPage,
 });
 
-function SettingsPage() {
+export function SettingsPage() {
   return (
     <DashboardShell title="Settings">
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">

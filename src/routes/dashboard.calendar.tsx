@@ -13,7 +13,7 @@ export const Route = createFileRoute("/dashboard/calendar")({
   component: CalendarPage,
 });
 
-function CalendarPage() {
+export function CalendarPage() {
   const [view, setView] = useState<"day" | "week">("week");
   const [anchor, setAnchor] = useState(() => {
     const d = new Date();

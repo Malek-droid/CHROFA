@@ -76,8 +76,8 @@ function CalendarPage() {
           ))}
 
           {hours.map((h) => (
-            <>
-              <div key={`h-${h}`} className="bg-card px-2 py-3 text-right text-[10px] text-muted-foreground">{h}:00</div>
+            <div key={`row-${h}`} className="contents">
+              <div className="bg-card px-2 py-3 text-right text-[10px] text-muted-foreground">{h}:00</div>
               {dates.map((d) => {
                 const slot = APPOINTMENTS.find((a) => {
                   const ad = new Date(a.date);
@@ -102,7 +102,7 @@ function CalendarPage() {
                   </div>
                 );
               })}
-            </>
+            </div>
           ))}
         </div>
       </div>

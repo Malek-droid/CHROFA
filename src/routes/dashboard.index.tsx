@@ -107,8 +107,8 @@ function WeekGrid({ onSelect }: { onSelect: (a: Appointment) => void }) {
           </div>
         ))}
         {hours.map((h) => (
-          <>
-            <div key={`h-${h}`} className="bg-card px-2 py-3 text-right text-[10px] text-muted-foreground">{h}:00</div>
+          <div key={`row-${h}`} className="contents">
+            <div className="bg-card px-2 py-3 text-right text-[10px] text-muted-foreground">{h}:00</div>
             {days.map((d) => {
               const slot = APPOINTMENTS.find((a) => {
                 const ad = new Date(a.date);
@@ -128,7 +128,7 @@ function WeekGrid({ onSelect }: { onSelect: (a: Appointment) => void }) {
                 </div>
               );
             })}
-          </>
+          </div>
         ))}
       </div>
     </div>

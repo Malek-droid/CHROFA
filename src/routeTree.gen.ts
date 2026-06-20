@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CalendarRouteImport } from './routes/calendar'
@@ -24,6 +25,11 @@ import { Route as DashboardAnalyticsRouteImport } from './routes/dashboard.analy
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/calendar': typeof CalendarRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/dashboard/analytics': typeof DashboardAnalyticsRoute
   '/dashboard/appointments': typeof DashboardAppointmentsRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/book': typeof BookRoute
   '/calendar': typeof CalendarRoute
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/dashboard/analytics': typeof DashboardAnalyticsRoute
   '/dashboard/appointments': typeof DashboardAppointmentsRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/calendar': typeof CalendarRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/dashboard/analytics': typeof DashboardAnalyticsRoute
   '/dashboard/appointments': typeof DashboardAppointmentsRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/dashboard'
     | '/login'
+    | '/settings'
     | '/signup'
     | '/dashboard/analytics'
     | '/dashboard/appointments'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/book'
     | '/calendar'
     | '/login'
+    | '/settings'
     | '/signup'
     | '/dashboard/analytics'
     | '/dashboard/appointments'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/dashboard'
     | '/login'
+    | '/settings'
     | '/signup'
     | '/dashboard/analytics'
     | '/dashboard/appointments'
@@ -163,6 +175,7 @@ export interface RootRouteChildren {
   CalendarRoute: typeof CalendarRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
 }
 
@@ -173,6 +186,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -274,6 +294,7 @@ const rootRouteChildren: RootRouteChildren = {
   CalendarRoute: CalendarRoute,
   DashboardRoute: DashboardRouteWithChildren,
   LoginRoute: LoginRoute,
+  SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
 }
 export const routeTree = rootRouteImport

@@ -42,6 +42,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-indigo: var(--indigo);
+  --color-steel: var(--steel);
+  --color-mint: var(--mint);
+  --color-khaki: var(--khaki);
+  --color-taupe: var(--taupe);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-blue: var(--brand-blue);
 }
 
 /* Light mode */
@@ -79,6 +86,13 @@
   --sidebar-accent-foreground: oklch(0.2 0.01 260);
   --sidebar-border: oklch(0.92 0.005 260);
   --sidebar-ring: oklch(0.55 0.2 270);
+  --indigo: oklch(0.311 0.038 267.4);
+  --steel: oklch(0.688 0.059 236.6);
+  --mint: oklch(0.961 0.014 155.6);
+  --khaki: oklch(0.749 0.03 44.9);
+  --taupe: oklch(0.587 0.029 52);
+  --brand-ink: oklch(0.311 0.038 267.4);
+  --brand-blue: oklch(0.5 0.15 250);
 }
 
 /* Dark mode (default) */

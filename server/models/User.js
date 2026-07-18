@@ -1,7 +1,7 @@
-'use strict';
+"use strict";
 
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const SALT_ROUNDS = 12;
 
@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema(
       index: true,
       // Basic format validation — more thorough validation belongs in a
       // controller/service layer, but this prevents obviously malformed values.
-      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address.'],
+      match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address."],
     },
 
     password: {
@@ -33,22 +33,22 @@ const userSchema = new mongoose.Schema(
       required: false,
       // Never return password in query results by default.
       select: false,
-      minlength: [8, 'Password must be at least 8 characters.'],
+      minlength: [8, "Password must be at least 8 characters."],
     },
 
     role: {
       type: String,
       enum: {
-        values: ['owner'],
-        message: 'Role must be one of: owner.',
+        values: ["owner"],
+        message: "Role must be one of: owner.",
       },
-      default: 'owner',
+      default: "owner",
       required: true,
     },
 
     businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Business',
+      ref: "Business",
       required: false,
       default: null,
     },
@@ -63,22 +63,19 @@ const userSchema = new mongoose.Schema(
     authProvider: {
       type: String,
       enum: {
-        values: ['local', 'google'],
-        message: 'authProvider must be one of: local, google.',
+        values: ["local", "google"],
+        message: "authProvider must be one of: local, google.",
       },
-      default: 'local',
+      default: "local",
       required: true,
     },
 
     googleId: {
       type: String,
       required: false,
-      default: null,
-      // Sparse index: documents where googleId is null are excluded from the
-      // index entirely. This means multiple local-auth users (all with
-      // googleId: null) do NOT violate a unique constraint because null
-      // values are not indexed. Only non-null googleId values are checked for
-      // uniqueness, which is exactly the behaviour we need.
+      // No default — for a sparse unique index the field must be ABSENT (not null)
+      // on local-auth users so MongoDB skips them entirely. Only Google-authed
+      // users have googleId set explicitly.
       index: { unique: true, sparse: true },
     },
 
@@ -98,15 +95,15 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // ─── Pre-save hook: password hashing ─────────────────────────────────────────
 // Only re-hash if password field was modified (covers both creation and updates).
 // This means changing an unrelated field (e.g. name) does NOT trigger a
 // pointless rehash.
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password') || !this.password) return next();
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password") || !this.password) return next();
 
   try {
     this.password = await bcrypt.hash(this.password, SALT_ROUNDS);
@@ -124,6 +121,6 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
 
 module.exports = User;

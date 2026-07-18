@@ -407,7 +407,7 @@ function IntegrationRow({
       {status === "disconnected" ? (
         <Button
           variant="outline"
-          className="border-steel text-steel hover:bg-steel/10 hover:text-steel"
+          className="border-brand-ink text-brand-ink hover:bg-brand-ink/10 hover:text-brand-ink"
           onClick={() => toast.info("Coming soon — hook up your real provider later.")}
         >
           Connect

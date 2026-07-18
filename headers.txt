@@ -1,0 +1,11 @@
+HTTP/1.1 400 Bad Request
+X-Powered-By: Express
+Vary: Origin
+Access-Control-Allow-Credentials: true
+Content-Type: application/json; charset=utf-8
+Content-Length: 1037
+ETag: W/"40d-sKQursjiyhJ1Zu9qyJbkkRzq5Y8"
+Date: Sun, 21 Jun 2026 20:23:16 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+

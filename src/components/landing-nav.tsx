@@ -1,30 +1,37 @@
 import { Link } from "@tanstack/react-router";
-import { CalendarClock } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export function LandingNav() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <Link to="/" className="flex items-center gap-2 text-foreground">
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-primary/15 text-primary">
-            <CalendarClock className="h-4 w-4" />
-          </span>
-          <span className="text-sm font-semibold tracking-tight">Cadence</span>
+        {/* Logo placeholder — replace with brand mark */}
+        <Link to="/" className="flex items-center gap-3" aria-label="Chrofa home">
+          <div
+            aria-hidden
+            className="h-9 w-28 rounded-md border border-dashed border-border"
+          />
         </Link>
-        <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-          <Link to="/book" className="hover:text-foreground">Book</Link>
-          <Link to="/dashboard" className="hover:text-foreground">Dashboard</Link>
-          <Link to="/calendar" className="hover:text-foreground">Calendar</Link>
-          <Link to="/settings" className="hover:text-foreground">Settings</Link>
+
+        <nav className="hidden items-center gap-8 md:flex">
+          <Link to="/search" className="text-sm text-muted-foreground transition-opacity hover:opacity-70">Book</Link>
+          <Link to="/dashboard" className="text-sm text-muted-foreground transition-opacity hover:opacity-70">Dashboard</Link>
+          <Link to="/calendar" className="text-sm text-muted-foreground transition-opacity hover:opacity-70">Calendar</Link>
+          <Link to="/settings" className="text-sm text-muted-foreground transition-opacity hover:opacity-70">Settings</Link>
         </nav>
+
         <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/login">Sign in</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link to="/signup">Get started</Link>
-          </Button>
+          <Link
+            to="/login"
+            className="hidden rounded-full px-4 py-2 text-sm text-foreground transition-opacity hover:opacity-70 sm:inline-flex"
+          >
+            Sign in
+          </Link>
+          <Link
+            to="/signup"
+            className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            Get started
+          </Link>
         </div>
       </div>
     </header>

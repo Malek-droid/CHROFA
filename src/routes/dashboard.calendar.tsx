@@ -258,17 +258,16 @@ export function CalendarPage() {
                           <button
                             onClick={() => setSelected(slot)}
                             className={cn(
-                              "absolute inset-1 rounded-md border-l-[3px] border px-2 py-1 text-left transition shadow-sm flex flex-col justify-center gap-0.5 hover:opacity-90 overflow-hidden",
+                              "absolute inset-1 rounded-md border-l-[3px] border px-3 py-1 text-left transition shadow-sm flex items-center hover:opacity-90 overflow-hidden",
                               isCancelled
                                 ? "bg-destructive/10 border-destructive border border-y-destructive/20 border-r-destructive/20 text-muted-foreground line-through"
                                 : cn(color.bg, color.border, color.borderLight, color.text)
                             )}
                           >
-                            <div className="truncate text-[11px] font-bold leading-tight">
-                              {slot.customer}
-                            </div>
-                            <div className="truncate text-[9px] font-medium opacity-80 leading-tight">
-                              {slot.service}
+                            <div className="truncate text-[11px] select-none w-full">
+                              <span className="font-bold">{slot.customer}</span>
+                              <span className="mx-1.5 opacity-60">•</span>
+                              <span className="text-[10px] font-medium opacity-80">{slot.service}</span>
                             </div>
                           </button>
                         );

@@ -43,10 +43,21 @@ const errorHandler = (err, req, res, next) => {
   // error collection…" strings.
   if (err.code === 11000) {
     const field = Object.keys(err.keyValue || {})[0] || 'field';
+    
+    // Provide user-friendly messages for specific fields
+    let message;
+    if (field === 'slug') {
+      message = 'A business with this name already exists. Please choose a different name.';
+    } else if (field === 'email') {
+      message = 'An account with this email already exists.';
+    } else {
+      message = `A record with that ${field} already exists.`;
+    }
+    
     return res.status(409).json({
       success: false,
       error: {
-        message: `A record with that ${field} already exists.`,
+        message,
         code: 'DUPLICATE_KEY',
         ...(isDevelopment && { stack: err.stack }),
       },

@@ -14,6 +14,79 @@ export const Route = createFileRoute("/dashboard/calendar")({
   component: CalendarPage,
 });
 
+const SERVICE_COLORS = [
+  {
+    bg: "bg-[#78A1BB]/10",
+    border: "border-[#78A1BB]",
+    borderLight: "border-y-[#78A1BB]/20 border-r-[#78A1BB]/20",
+    text: "text-[#2e6a8c]",
+  },
+  {
+    bg: "bg-[#9B8EA0]/10",
+    border: "border-[#9B8EA0]",
+    borderLight: "border-y-[#9B8EA0]/20 border-r-[#9B8EA0]/20",
+    text: "text-[#6b4f74]",
+  },
+  {
+    bg: "bg-[#7AB8A4]/10",
+    border: "border-[#7AB8A4]",
+    borderLight: "border-y-[#7AB8A4]/20 border-r-[#7AB8A4]/20",
+    text: "text-[#2e7a63]",
+  },
+  {
+    bg: "bg-[#C4A882]/10",
+    border: "border-[#C4A882]",
+    borderLight: "border-y-[#C4A882]/20 border-r-[#C4A882]/20",
+    text: "text-[#8a6233]",
+  },
+  {
+    bg: "bg-[#8EA8C3]/10",
+    border: "border-[#8EA8C3]",
+    borderLight: "border-y-[#8EA8C3]/20 border-r-[#8EA8C3]/20",
+    text: "text-[#2d5476]",
+  },
+  {
+    bg: "bg-[#A8B87A]/10",
+    border: "border-[#A8B87A]",
+    borderLight: "border-y-[#A8B87A]/20 border-r-[#A8B87A]/20",
+    text: "text-[#5a6e1f]",
+  },
+  {
+    bg: "bg-[#BF8E8E]/10",
+    border: "border-[#BF8E8E]",
+    borderLight: "border-y-[#BF8E8E]/20 border-r-[#BF8E8E]/20",
+    text: "text-[#7a3535]",
+  },
+  {
+    bg: "bg-[#BFA89E]/10",
+    border: "border-[#BFA89E]",
+    borderLight: "border-y-[#BFA89E]/20 border-r-[#BFA89E]/20",
+    text: "text-[#705244]",
+  },
+  {
+    bg: "bg-[#B8A07A]/10",
+    border: "border-[#B8A07A]",
+    borderLight: "border-y-[#B8A07A]/20 border-r-[#B8A07A]/20",
+    text: "text-[#7a5e1e]",
+  },
+  {
+    bg: "bg-[#A0B89B]/10",
+    border: "border-[#A0B89B]",
+    borderLight: "border-y-[#A0B89B]/20 border-r-[#A0B89B]/20",
+    text: "text-[#3a6335]",
+  },
+];
+
+function getServiceColor(service: string) {
+  if (!service) return SERVICE_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < service.length; i++) {
+    hash = service.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % SERVICE_COLORS.length;
+  return SERVICE_COLORS[index];
+}
+
 export function CalendarPage() {
   const { appointments } = useAppointments();
   const [view, setView] = useState<"day" | "week">("week");
@@ -178,27 +251,28 @@ export function CalendarPage() {
                         dIdx < days - 1 && "border-r border-border/30",
                       )}
                     >
-                      {slot && (
-                        <button
-                          onClick={() => setSelected(slot)}
-                          className={cn(
-                            "absolute inset-1 rounded-md border-l-4 px-2.5 py-1.5 text-left transition shadow-sm flex flex-col justify-start",
-                            slot.status === "confirmed" &&
-                              "bg-primary/10 border-primary border border-y-primary/20 border-r-primary/20 text-primary",
-                            slot.status === "pending" &&
-                              "bg-amber-500/10 border-amber-500 border border-y-amber-500/20 border-r-amber-500/20 text-amber-500",
-                            slot.status === "cancelled" &&
-                              "bg-destructive/10 border-destructive border border-y-destructive/20 border-r-destructive/20 text-muted-foreground line-through",
-                          )}
-                        >
-                          <div className="truncate text-xs font-semibold text-foreground/90">
-                            {slot.customer}
-                          </div>
-                          <div className="truncate text-[10px] text-muted-foreground font-medium mt-0.5">
-                            {slot.service}
-                          </div>
-                        </button>
-                      )}
+                      {slot && (() => {
+                        const color = getServiceColor(slot.service);
+                        const isCancelled = slot.status === "cancelled";
+                        return (
+                          <button
+                            onClick={() => setSelected(slot)}
+                            className={cn(
+                              "absolute inset-1 rounded-md border-l-[3px] border px-2 py-1 text-left transition shadow-sm flex flex-col justify-center gap-0.5 hover:opacity-90 overflow-hidden",
+                              isCancelled
+                                ? "bg-destructive/10 border-destructive border border-y-destructive/20 border-r-destructive/20 text-muted-foreground line-through"
+                                : cn(color.bg, color.border, color.borderLight, color.text)
+                            )}
+                          >
+                            <div className="truncate text-[11px] font-bold leading-tight">
+                              {slot.customer}
+                            </div>
+                            <div className="truncate text-[9px] font-medium opacity-80 leading-tight">
+                              {slot.service}
+                            </div>
+                          </button>
+                        );
+                      })()}
                     </div>
                   );
                 })}

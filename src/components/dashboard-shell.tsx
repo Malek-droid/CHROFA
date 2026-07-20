@@ -65,7 +65,7 @@ function NavItem({
       to={to}
       onClick={onNavigate}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200 relative",
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-150 relative",
         collapsed && "justify-center px-0",
         active
           ? "bg-brand-ink/10 text-brand-ink"
@@ -124,15 +124,15 @@ export function DashboardShell({
   const headerAction = action || actions;
 
   return (
-    <div className="flex h-full overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col border-r border-border bg-sidebar overflow-hidden lg:static",
-          collapsed ? "w-16" : "w-60",
-          collapsed ? "lg:w-16" : "lg:w-60",
+          collapsed ? "w-16 min-w-16" : "w-60 min-w-60",
+          collapsed ? "lg:w-16 lg:min-w-16" : "lg:w-60 lg:min-w-60",
           openMobile ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-          "transition-[width,transform] duration-300 ease-in-out",
+          "transition-[transform] duration-300 ease-in-out",
         )}
       >
         {/* Logo + toggle */}
@@ -193,7 +193,7 @@ export function DashboardShell({
           <button
             onClick={handleLogout}
             className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-sidebar-accent transition-all duration-200",
+              "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-sidebar-accent transition-colors duration-150",
               collapsed && "justify-center px-0",
             )}
             title={collapsed ? "Sign out" : undefined}

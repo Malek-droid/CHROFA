@@ -12,7 +12,6 @@ type Props = {
   mode: "login" | "signup";
 };
 
-
 export function AuthCard({ mode }: Props) {
   const isLogin = mode === "login";
   const { login, register } = useAuth();
@@ -74,7 +73,6 @@ export function AuthCard({ mode }: Props) {
       }, 2200);
     } catch (err: any) {
       console.error(err);
-      // Handle field-level validation errors
       if (err.details && Array.isArray(err.details)) {
         const errors: Record<string, string> = {};
         err.details.forEach((detail: { field: string; message: string }) => {
@@ -82,8 +80,12 @@ export function AuthCard({ mode }: Props) {
         });
         setFieldErrors(errors);
         setErrorMsg("Please fix the errors below.");
+        const first = err.details[0];
+        toast.error(first.message || "Please fix the errors below.");
       } else {
-        setErrorMsg(err.message || "An authentication error occurred.");
+        const msg = err.message || "An authentication error occurred.";
+        setErrorMsg(msg);
+        toast.error(msg);
       }
     } finally {
       setLoading(false);
@@ -169,9 +171,7 @@ export function AuthCard({ mode }: Props) {
                   disabled={loading}
                   className="h-11 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent transition-colors"
                 />
-                {fieldErrors.name && (
-                  <p className="text-xs text-destructive">{fieldErrors.name}</p>
-                )}
+                {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
               </div>
             )}
 
@@ -188,9 +188,7 @@ export function AuthCard({ mode }: Props) {
                 disabled={loading}
                 className="h-11 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent transition-colors"
               />
-              {fieldErrors.email && (
-                <p className="text-xs text-destructive">{fieldErrors.email}</p>
-              )}
+              {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
             </div>
 
             <div className="space-y-2">

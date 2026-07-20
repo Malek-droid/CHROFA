@@ -326,6 +326,36 @@ const businessSchema = new mongoose.Schema(
   }
 );
 
+// ─── Pre-save hook: auto-generate slug from name ──────────────────────────────────
+// Generates a URL-friendly slug from the business name if not already set.
+// Handles collisions by appending a numeric suffix (e.g. "joes-salon-2").
+businessSchema.pre('save', async function(next) {
+  // Only generate slug if it's null/undefined and name is present
+  if (this.slug === undefined || this.slug === null) {
+    if (this.name) {
+      const baseSlug = this.name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
+        .replace(/\s+/g, '-')         // Spaces to hyphens
+        .replace(/-+/g, '-')          // Collapse multiple hyphens
+        .replace(/^-|-$/g, '');       // Trim leading/trailing hyphens
+
+      let finalSlug = baseSlug;
+      let counter = 1;
+
+      // Check for collisions and append suffix if needed
+      while (await this.constructor.findOne({ slug: finalSlug, _id: { $ne: this._id } })) {
+        finalSlug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+
+      this.slug = finalSlug || `business-${Date.now()}`; // Fallback if name is all special chars
+    }
+  }
+  next();
+});
+
 const Business = mongoose.model('Business', businessSchema);
 
 module.exports = Business;

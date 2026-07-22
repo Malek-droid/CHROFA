@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
+import { CURRENCIES, getCurrencySymbol } from "@/lib/currency";
+import { TIMEZONES } from "@/lib/timezones";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -256,10 +258,12 @@ interface Step1Props {
   setBusinessName: (v: string) => void;
   industry: Industry | "";
   setIndustry: (v: Industry) => void;
+  currency: string;
+  setCurrency: (v: string) => void;
   errors: Record<string, string>;
 }
 
-function Step1({ businessName, setBusinessName, industry, setIndustry, errors }: Step1Props) {
+function Step1({ businessName, setBusinessName, industry, setIndustry, currency, setCurrency, errors }: Step1Props) {
   const tiers = [1, 2, 3, 4];
   const tierLabels: Record<number, string> = {
     1: "Most Popular",
@@ -312,6 +316,22 @@ function Step1({ businessName, setBusinessName, industry, setIndustry, errors }:
         </Select>
         {errors.industry && <p className="text-xs text-destructive">{errors.industry}</p>}
       </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="currency">Currency</Label>
+        <Select value={currency} onValueChange={setCurrency}>
+          <SelectTrigger id="currency">
+            <SelectValue placeholder="Select currency…" />
+          </SelectTrigger>
+          <SelectContent>
+            {CURRENCIES.map((c) => (
+              <SelectItem key={c.code} value={c.code}>
+                {c.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }
@@ -322,10 +342,11 @@ interface Step2Props {
   industry: Industry;
   services: ServiceEntry[];
   setServices: (v: ServiceEntry[]) => void;
+  currency: string;
   errors: Record<string, string>;
 }
 
-function Step2({ industry, services, setServices, errors }: Step2Props) {
+function Step2({ industry, services, setServices, currency, errors }: Step2Props) {
   const hasPresets = INDUSTRY_PRESETS[industry]?.length > 0;
 
   const addService = () => {
@@ -405,7 +426,7 @@ function Step2({ industry, services, setServices, errors }: Step2Props) {
               </div>
               <div>
                 <Label htmlFor={`svc-price-${svc.id}`} className="text-xs">
-                  Price (optional)
+                  Price ({getCurrencySymbol(currency)}) (optional)
                 </Label>
                 <Input
                   id={`svc-price-${svc.id}`}
@@ -578,25 +599,26 @@ function Step4({ hours, setHours, timezone, setTimezone, errors }: Step4Props) {
 
       <div className="space-y-1.5">
         <Label htmlFor="timezone">Timezone</Label>
-        <Input
-          id="timezone"
-          placeholder="e.g. America/New_York"
-          value={timezone}
-          onChange={(e) => setTimezone(e.target.value)}
-          className={errors.timezone ? "border-destructive" : ""}
-        />
+        <Select value={timezone} onValueChange={(v) => setTimezone(v)}>
+          <SelectTrigger id="timezone" className={errors.timezone ? "border-destructive" : ""}>
+            <SelectValue placeholder="Select timezone…" />
+          </SelectTrigger>
+          <SelectContent className="max-h-60">
+            {(() => {
+              const options = [...TIMEZONES];
+              if (timezone && !options.some((t) => t.value === timezone)) {
+                options.unshift({ value: timezone, label: timezone });
+              }
+              return options.map((tz) => (
+                <SelectItem key={tz.value} value={tz.value}>
+                  {tz.label} ({tz.value})
+                </SelectItem>
+              ));
+            })()}
+          </SelectContent>
+        </Select>
         <p className="text-xs text-muted-foreground">
-          Use IANA format — find yours at{" "}
-          <a
-            href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary underline-offset-2 hover:underline"
-          >
-            this list
-          </a>
-          . Example:{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">Europe/London</code>
+          Select your local business timezone for appointments and scheduling.
         </p>
         {errors.timezone && <p className="text-xs text-destructive">{errors.timezone}</p>}
       </div>
@@ -616,6 +638,7 @@ function OnboardingPage() {
   // ── Step 1 state ───────────────────────────────────────────────────────────
   const [businessName, setBusinessName] = useState("");
   const [industry, setIndustry] = useState<Industry | "">("");
+  const [currency, setCurrency] = useState("USD");
 
   // ── Step 2 state ───────────────────────────────────────────────────────────
   const [services, setServices] = useState<ServiceEntry[]>([]);
@@ -678,6 +701,7 @@ function OnboardingPage() {
         setDraftId(biz._id || biz.id);
         if (biz.name) setBusinessName(biz.name);
         if (biz.industry) setIndustry(biz.industry as Industry);
+        if (biz.currency) setCurrency(biz.currency);
         if (Array.isArray(biz.services) && biz.services.length > 0) {
           setServices(
             biz.services.map((s: any) => ({
@@ -787,6 +811,7 @@ function OnboardingPage() {
             body: JSON.stringify({
               name: businessName.trim(),
               industry,
+              currency,
               draft: true,
             }),
           }
@@ -795,10 +820,10 @@ function OnboardingPage() {
           setDraftId((res.business.id || res.business._id) ?? null);
         }
       } else if (step === 0 && draftId) {
-        // Already have a draft — just PATCH the name/industry
+        // Already have a draft — just PATCH the name/industry/currency
         await apiFetch("/business", {
           method: "PATCH",
-          body: JSON.stringify({ name: businessName.trim(), industry }),
+          body: JSON.stringify({ name: businessName.trim(), industry, currency }),
         });
       } else if (step === 1 && draftId) {
         await apiFetch("/business", {
@@ -852,6 +877,7 @@ function OnboardingPage() {
               closeTime: h.isOpen ? h.closeTime : null,
             })),
             timezone: timezone.trim(),
+            currency,
             isOnboarded: true,
           }),
         });
@@ -862,6 +888,7 @@ function OnboardingPage() {
           body: JSON.stringify({
             name: businessName.trim(),
             industry,
+            currency,
             services: services.map((s) => ({
               name: s.name.trim(),
               durationMinutes: Number(s.durationMinutes),
@@ -928,7 +955,7 @@ function OnboardingPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => e.preventDefault()}>
             <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
               {step === 0 && (
                 <Step1
@@ -938,6 +965,8 @@ function OnboardingPage() {
                   setIndustry={(v) => {
                     setIndustry(v);
                   }}
+                  currency={currency}
+                  setCurrency={setCurrency}
                   errors={errors}
                 />
               )}
@@ -946,6 +975,7 @@ function OnboardingPage() {
                   industry={industry as Industry}
                   services={services}
                   setServices={setServices}
+                  currency={currency}
                   errors={errors}
                 />
               )}
@@ -992,7 +1022,12 @@ function OnboardingPage() {
                   <AltArrowRight className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button type="submit" disabled={submitting} className="gap-1.5 min-w-32">
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="gap-1.5 min-w-32"
+                >
                   {submitting ? (
                     <>
                       <Refresh className="h-4 w-4 animate-spin" />

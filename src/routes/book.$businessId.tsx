@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
+import { formatPrice } from "@/lib/currency";
 
 export const Route = createFileRoute("/book/$businessId")({
   head: () => ({
@@ -42,6 +43,7 @@ type BackendBusiness = {
   name: string;
   phone: string | null;
   timezone: string;
+  currency?: string;
   slug: string | null;
   headerTagline: string | null;
   industry: string | null;
@@ -778,6 +780,7 @@ function CalendarView({ business, businessId }: { business: BackendBusiness; bus
                 <ServiceCard
                   key={s.id}
                   service={s}
+                  currency={business.currency}
                   selected={service?.id === s.id}
                   onSelect={() => setService(s)}
                 />
@@ -971,10 +974,12 @@ function Stepper({ step }: { step: number }) {
 
 function ServiceCard({
   service,
+  currency,
   selected,
   onSelect,
 }: {
   service: Service;
+  currency?: string;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -1000,7 +1005,11 @@ function ServiceCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
           <h3 className="truncate text-sm font-semibold text-foreground">{service.name}</h3>
-          <span className="shrink-0 text-sm font-medium text-foreground">${service.price}</span>
+          {service.price != null && (
+            <span className="shrink-0 text-sm font-medium text-foreground">
+              {formatPrice(service.price, currency)}
+            </span>
+          )}
         </div>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {service.durationMinutes} min

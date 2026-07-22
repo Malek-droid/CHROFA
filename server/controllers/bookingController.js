@@ -20,9 +20,6 @@ async function findBusinessByIdOrSlug(param) {
   } else {
     business = await Business.findOne({ slug: param });
   }
-  if (business && !business.isOnboarded) {
-    return null;
-  }
   return business;
 }
 
@@ -48,6 +45,7 @@ function publicBusiness(doc) {
     name: doc.name,
     phone: doc.phone || null,
     timezone: doc.timezone,
+    currency: doc.currency || "USD",
     slug: doc.slug || null,
     headerTagline: doc.headerTagline || null,
     industry: doc.industry || null,
@@ -110,6 +108,13 @@ exports.getBusinessPublic = async (req, res, next) => {
     const err = new Error("This booking link is invalid or expired.");
     err.statusCode = 404;
     err.code = "NOT_FOUND";
+    return next(err);
+  }
+
+  if (!business.isOnboarded) {
+    const err = new Error("This business hasn't finished setup yet.");
+    err.statusCode = 404;
+    err.code = "BUSINESS_NOT_ONBOARDED";
     return next(err);
   }
 
@@ -277,6 +282,7 @@ exports.chat = async (req, res, next) => {
         });
 
         // Send confirmation email
+        const matchedSvc = business.services.find((s) => s.name.toLowerCase() === (mergedExtracted.service || "").toLowerCase());
         sendConfirmationEmail({
           to: mergedExtracted.customerEmail,
           customerName: mergedExtracted.customerName,
@@ -285,6 +291,8 @@ exports.chat = async (req, res, next) => {
           date: mergedExtracted.date,
           time: mergedExtracted.timePreference,
           staffName: appointment.staffName,
+          price: matchedSvc ? matchedSvc.price : null,
+          currency: business.currency || "USD",
         }).catch((err) => console.error("[bookingController/chat] Failed to send confirmation email:", err));
 
         // Async Google Calendar sync
@@ -461,6 +469,7 @@ exports.confirm = async (req, res, next) => {
     });
 
     // ── Send confirmation email ───────────────────────────────────────────────────
+    const confirmedSvc = business.services.find((s) => s.name.toLowerCase() === (service || "").toLowerCase());
     sendConfirmationEmail({
       to: customerEmail,
       customerName,
@@ -469,6 +478,8 @@ exports.confirm = async (req, res, next) => {
       date: date,
       time: time,
       staffName: appointment.staffName,
+      price: confirmedSvc ? confirmedSvc.price : null,
+      currency: business.currency || "USD",
     }).catch((err) => console.error("[bookingController] Failed to send confirmation email:", err));
 
     // ── Async Google Calendar sync (fires after response is sent) ──────────────

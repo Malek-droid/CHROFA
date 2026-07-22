@@ -42,6 +42,7 @@ const sendAccessTokenCookie = (res, token) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
+    path: "/",
     maxAge: 15 * 60 * 1000, // 15 minutes
   };
   res.cookie("accessToken", token, cookieOptions);
@@ -55,6 +56,7 @@ const sendRefreshTokenCookie = (res, token) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
+    path: "/",
     maxAge: REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000, // 7 days
   };
   res.cookie("refreshToken", token, cookieOptions);
@@ -64,16 +66,20 @@ const sendRefreshTokenCookie = (res, token) => {
  * Helper to clear auth cookies
  */
 const clearAuthCookies = (res) => {
-  res.cookie("accessToken", "", {
+  const clearOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
+    path: "/",
+  };
+  res.clearCookie("accessToken", clearOptions);
+  res.clearCookie("refreshToken", clearOptions);
+  res.cookie("accessToken", "", {
+    ...clearOptions,
     expires: new Date(0),
   });
   res.cookie("refreshToken", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...clearOptions,
     expires: new Date(0),
   });
 };
@@ -156,12 +162,11 @@ exports.register = async (req, res, next) => {
   // Generate tokens
   const accessToken = signAccessToken(user._id, user.role);
   const refreshToken = signRefreshToken(user._id);
-  const randomRefreshToken = generateRandomToken();
 
-  // Store refresh token in database
+  // Store the refresh token JWT itself in the database so logout can invalidate it
   await storeRefreshToken(
     user._id,
-    randomRefreshToken,
+    refreshToken,
     req.get("user-agent"),
     req.ip
   );
@@ -218,12 +223,11 @@ exports.login = async (req, res, next) => {
   // Generate tokens
   const accessToken = signAccessToken(user._id, user.role);
   const refreshToken = signRefreshToken(user._id);
-  const randomRefreshToken = generateRandomToken();
 
-  // Store refresh token in database
+  // Store the refresh token JWT itself in the database so logout can invalidate it
   await storeRefreshToken(
     user._id,
-    randomRefreshToken,
+    refreshToken,
     req.get("user-agent"),
     req.ip
   );
@@ -253,10 +257,23 @@ exports.login = async (req, res, next) => {
 exports.logout = async (req, res, next) => {
   try {
     const refreshToken = req.cookies.refreshToken;
+    const accessToken = req.cookies.accessToken;
 
     if (refreshToken) {
       // Delete refresh token from database
       await deleteRefreshToken(refreshToken);
+    }
+
+    // Set lastLogoutAt on user document so any existing access token is invalidated
+    if (accessToken) {
+      try {
+        const decoded = jwt.verify(accessToken, process.env.JWT_SECRET, { ignoreExpiration: true });
+        if (decoded && decoded.userId) {
+          await User.findByIdAndUpdate(decoded.userId, { lastLogoutAt: new Date() });
+        }
+      } catch (e) {
+        // Silently ignore decode error
+      }
     }
 
     // Clear cookies
@@ -305,7 +322,7 @@ exports.refresh = async (req, res, next) => {
       return next(err);
     }
 
-    // Verify refresh token
+    // Verify refresh token signature and expiry
     let decoded;
     try {
       decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
@@ -319,6 +336,16 @@ exports.refresh = async (req, res, next) => {
     // Check if it's actually a refresh token
     if (decoded.type !== "refresh") {
       const err = new Error("Invalid token type.");
+      err.statusCode = 401;
+      err.code = "UNAUTHORIZED";
+      return next(err);
+    }
+
+    // Verify the token exists in the database (invalidated on logout)
+    const storedToken = await RefreshToken.findOne({ token: refreshToken });
+    if (!storedToken) {
+      clearAuthCookies(res);
+      const err = new Error("Refresh token has been revoked. Please sign in again.");
       err.statusCode = 401;
       err.code = "UNAUTHORIZED";
       return next(err);

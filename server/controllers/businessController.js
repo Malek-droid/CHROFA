@@ -23,7 +23,7 @@ exports.createBusiness = async (req, res, next) => {
       return next(err);
     }
 
-    const { name, industry, services, staff, openingHours, timezone, draft } = req.body;
+    const { name, industry, services, staff, openingHours, timezone, currency, draft } = req.body;
     const isDraft = !!draft;
 
     // ── Name validation ──────────────────────────────────────────────────────
@@ -145,6 +145,7 @@ exports.createBusiness = async (req, res, next) => {
           })))
         : openingHours,
       timezone: timezone ? timezone.trim() : 'America/New_York',
+      currency: currency ? currency.trim().toUpperCase() : 'USD',
     });
 
     // ── Link business to user ────────────────────────────────────────────────
@@ -158,6 +159,7 @@ exports.createBusiness = async (req, res, next) => {
         name: business.name,
         industry: business.industry,
         timezone: business.timezone,
+        currency: business.currency || 'USD',
         services: business.services,
         staff: business.staff,
         openingHours: business.openingHours,
@@ -204,6 +206,7 @@ exports.getMyBusiness = async (req, res, next) => {
         industry: business.industry,
         phone: business.phone,
         timezone: business.timezone,
+        currency: business.currency || 'USD',
         slug: business.slug,
         headerTagline: business.headerTagline,
         services: business.services,
@@ -322,6 +325,7 @@ exports.updateMyBusiness = async (req, res, next) => {
       name,
       phone,
       timezone,
+      currency,
       slug,
       headerTagline,
       bookingPreferences,
@@ -360,6 +364,16 @@ exports.updateMyBusiness = async (req, res, next) => {
         return next(err);
       }
       business.timezone = timezone.trim();
+    }
+
+    if (currency !== undefined && currency !== null && currency !== '') {
+      if (typeof currency !== 'string' || !currency.trim()) {
+        const err = new Error('Currency must be a non-empty string.');
+        err.statusCode = 400;
+        err.code = 'VALIDATION_ERROR';
+        return next(err);
+      }
+      business.currency = currency.trim().toUpperCase();
     }
 
     if (slug !== undefined) {
@@ -530,6 +544,7 @@ exports.updateMyBusiness = async (req, res, next) => {
         name: business.name,
         phone: business.phone,
         timezone: business.timezone,
+        currency: business.currency || 'USD',
         slug: business.slug,
         headerTagline: business.headerTagline,
         industry: business.industry,

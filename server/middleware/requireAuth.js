@@ -45,6 +45,15 @@ const requireAuth = async (req, res, next) => {
       return next(error);
     }
 
+    // Reject token if it was issued at or before the user's last logout
+    // decoded.iat is Unix seconds; lastLogoutAt is a Date
+    if (user.lastLogoutAt && decoded.iat <= Math.floor(user.lastLogoutAt.getTime() / 1000)) {
+      const error = new Error('Session has been invalidated. Please sign in again.');
+      error.statusCode = 401;
+      error.code = 'UNAUTHORIZED';
+      return next(error);
+    }
+
     // Attach user to the request object
     req.user = user;
     next();

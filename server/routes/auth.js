@@ -56,12 +56,11 @@ router.get(
     // Generate JWT tokens
     const accessToken = authController.signAccessToken(req.user._id, req.user.role);
     const refreshToken = authController.signRefreshToken(req.user._id);
-    const randomRefreshToken = authController.generateRandomToken();
     
-    // Store refresh token in database
+    // Store the refresh token JWT itself in the database so logout can invalidate it
     await authController.storeRefreshToken(
       req.user._id,
-      randomRefreshToken,
+      refreshToken,
       req.get('user-agent'),
       req.ip
     );

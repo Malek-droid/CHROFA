@@ -1,6 +1,7 @@
 "use strict";
 
 const nodemailer = require("nodemailer");
+const { formatPrice } = require("../utils/currency");
 
 // ─── Email transporter configuration ────────────────────────────────────────────
 
@@ -64,6 +65,8 @@ function getConfirmationEmailTemplate({
   date,
   time,
   staffName,
+  price,
+  currency,
 }) {
   return `
 <!DOCTYPE html>
@@ -113,6 +116,12 @@ function getConfirmationEmailTemplate({
           <span class="detail-value">${staffName}</span>
         </div>
         ` : ''}
+        ${price != null && price !== '' ? `
+        <div class="detail-row">
+          <span class="detail-label">Price</span>
+          <span class="detail-value">${formatPrice(price, currency || 'USD')}</span>
+        </div>
+        ` : ''}
       </div>
       
       <p>Please arrive 5-10 minutes early. If you need to reschedule, please contact the business directly.</p>
@@ -141,6 +150,8 @@ function getReminderEmailTemplate({
   date,
   time,
   staffName,
+  price,
+  currency,
 }) {
   return `
 <!DOCTYPE html>
@@ -194,6 +205,12 @@ function getReminderEmailTemplate({
           <span class="detail-value">${staffName}</span>
         </div>
         ` : ''}
+        ${price != null && price !== '' ? `
+        <div class="detail-row">
+          <span class="detail-label">Price</span>
+          <span class="detail-value">${formatPrice(price, currency || 'USD')}</span>
+        </div>
+        ` : ''}
       </div>
       
       <p>Please arrive 5-10 minutes early. If you need to reschedule or cancel, please contact the business as soon as possible.</p>
@@ -213,7 +230,7 @@ function getReminderEmailTemplate({
 /**
  * Send a booking confirmation email.
  */
-async function sendConfirmationEmail({ to, customerName, businessName, serviceName, date, time, staffName }) {
+async function sendConfirmationEmail({ to, customerName, businessName, serviceName, date, time, staffName, price, currency }) {
   if (!transporter) {
     console.warn("[emailService] Email transporter not initialized. Skipping confirmation email.");
     return;
@@ -226,6 +243,8 @@ async function sendConfirmationEmail({ to, customerName, businessName, serviceNa
     date,
     time,
     staffName,
+    price,
+    currency,
   });
 
   try {
@@ -244,7 +263,7 @@ async function sendConfirmationEmail({ to, customerName, businessName, serviceNa
 /**
  * Send a reminder email (24h before appointment).
  */
-async function sendReminderEmail({ to, customerName, businessName, serviceName, date, time, staffName }) {
+async function sendReminderEmail({ to, customerName, businessName, serviceName, date, time, staffName, price, currency }) {
   if (!transporter) {
     console.warn("[emailService] Email transporter not initialized. Skipping reminder email.");
     return;
@@ -257,6 +276,8 @@ async function sendReminderEmail({ to, customerName, businessName, serviceName, 
     date,
     time,
     staffName,
+    price,
+    currency,
   });
 
   try {

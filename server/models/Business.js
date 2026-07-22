@@ -238,6 +238,14 @@ const businessSchema = new mongoose.Schema(
       validate: ianaTimezoneValidator,
     },
 
+    currency: {
+      type: String,
+      required: true,
+      default: 'USD',
+      uppercase: true,
+      trim: true,
+    },
+
     // Stored as a fixed-length array of 7 entries (Sun=0 … Sat=6).
     // Availability-checking logic will query this by day index.
     openingHours: {

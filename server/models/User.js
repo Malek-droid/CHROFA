@@ -92,6 +92,12 @@ const userSchema = new mongoose.Schema(
       default: null,
       select: false, // Never return by default
     },
+
+    lastLogoutAt: {
+      type: Date,
+      required: false,
+      default: null,
+    },
   },
   {
     timestamps: true,

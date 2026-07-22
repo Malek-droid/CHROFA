@@ -14,6 +14,7 @@
 
 const GROQ_API_KEY = () => process.env.GROQ_API_KEY;
 const GROQ_MODEL = () => process.env.GROQ_MODEL || "llama3-70b-8192";
+const { formatPrice } = require("../utils/currency");
 
 // ─── Response schema constants ────────────────────────────────────────────────
 
@@ -110,14 +111,14 @@ function getNowInTimezone(timezone) {
  * @returns {string}
  */
 function buildSystemPrompt(businessContext) {
-  const { name, services, staff, openingHours, timezone } = businessContext;
+  const { name, services, staff, openingHours, timezone, currency = "USD" } = businessContext;
   const { dateStr, timeStr, dayName } = getNowInTimezone(timezone || "UTC");
 
   const serviceList = services.length
     ? services.filter(s => s.active !== false)
         .map((s) => {
           let line = `- ${s.name} (${s.durationMinutes} min)`;
-          if (s.price != null) line += ` — $${s.price}`;
+          if (s.price != null) line += ` — ${formatPrice(s.price, currency)}`;
           return line;
         })
         .join("\n")

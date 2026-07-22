@@ -696,6 +696,23 @@ function CalendarView({ business, businessId }: { business: BackendBusiness; bus
     [],
   );
 
+  // Derive today's ISO date string for past-time filtering
+  const todayIso = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+
+  // Filter TIME_SLOTS to hide past hours when the selected date is today
+  const availableTimeSlots = useMemo(() => {
+    if (date !== todayIso) return TIME_SLOTS;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return TIME_SLOTS.filter((slot) => {
+      const [h, m] = slot.split(":").map(Number);
+      return h * 60 + m > currentMinutes;
+    });
+  }, [date, todayIso]);
+
   const canNext =
     (step === 0 && !!service) ||
     (step === 1 && !!date && !!time) ||
@@ -780,7 +797,7 @@ function CalendarView({ business, businessId }: { business: BackendBusiness; bus
                   return (
                     <button
                       key={iso}
-                      onClick={() => setDate(iso)}
+                      onClick={() => { setDate(iso); setTime(null); }}
                       className={cn(
                         "flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2.5 text-xs transition-colors",
                         selected
@@ -801,23 +818,29 @@ function CalendarView({ business, businessId }: { business: BackendBusiness; bus
             <div>
               <h2 className="text-base font-semibold">Pick a time</h2>
               <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
-                {TIME_SLOTS.map((t) => {
-                  const selected = time === t;
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => setTime(t)}
-                      className={cn(
-                        "rounded-lg border px-2 py-2 text-sm transition-colors",
-                        selected
-                          ? "border-accent bg-accent/10 font-medium text-foreground"
-                          : "border-border text-foreground/80 hover:border-accent",
-                      )}
-                    >
-                      {formatTime(t)}
-                    </button>
-                  );
-                })}
+                {availableTimeSlots.length === 0 ? (
+                  <p className="col-span-full text-sm text-muted-foreground">
+                    No more available times today. Please select a future date.
+                  </p>
+                ) : (
+                  availableTimeSlots.map((t) => {
+                    const selected = time === t;
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => setTime(t)}
+                        className={cn(
+                          "rounded-lg border px-2 py-2 text-sm transition-colors",
+                          selected
+                            ? "border-accent bg-accent/10 font-medium text-foreground"
+                            : "border-border text-foreground/80 hover:border-accent",
+                        )}
+                      >
+                        {formatTime(t)}
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>

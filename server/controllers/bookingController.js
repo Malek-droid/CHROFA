@@ -1,5 +1,6 @@
 "use strict";
 
+const mongoose = require("mongoose");
 const Business = require("../models/Business");
 const Appointment = require("../models/Appointment");
 const { getAIResponse } = require("../services/aiBookingService");
@@ -7,6 +8,23 @@ const availabilityService = require("../services/availabilityService");
 const { createAppointment } = require("../services/appointmentService");
 const { addSyncJob } = require("../queues/calendarSyncQueue");
 const { sendConfirmationEmail } = require("../services/emailService");
+
+/**
+ * Find a business by either its MongoDB ObjectId or its URL slug.
+ * This enables /book/:businessId routes to accept both forms.
+ */
+async function findBusinessByIdOrSlug(param) {
+  let business;
+  if (mongoose.isValidObjectId(param)) {
+    business = await Business.findById(param);
+  } else {
+    business = await Business.findOne({ slug: param });
+  }
+  if (business && !business.isOnboarded) {
+    return null;
+  }
+  return business;
+}
 
 // ─── Sensitive fields to strip from public responses ─────────────────────────
 // These fields must NEVER be returned to unauthenticated callers.
@@ -87,7 +105,7 @@ function mergeExtractions(newExtracted, oldExtracted) {
  * requiring authentication.
  */
 exports.getBusinessPublic = async (req, res, next) => {
-  const business = await Business.findById(req.params.businessId);
+  const business = await findBusinessByIdOrSlug(req.params.businessId);
   if (!business) {
     const err = new Error("This booking link is invalid or expired.");
     err.statusCode = 404;
@@ -115,7 +133,7 @@ exports.getBusinessPublic = async (req, res, next) => {
  * the slots into a follow-up LLM call or returns them directly.
  */
 exports.chat = async (req, res, next) => {
-  const business = await Business.findById(req.params.businessId);
+  const business = await findBusinessByIdOrSlug(req.params.businessId);
   if (!business) {
     const err = new Error("Business not found.");
     err.statusCode = 404;
@@ -373,7 +391,7 @@ exports.chat = async (req, res, next) => {
  *   staffPreference {string} optional
  */
 exports.confirm = async (req, res, next) => {
-  const business = await Business.findById(req.params.businessId);
+  const business = await findBusinessByIdOrSlug(req.params.businessId);
   if (!business) {
     const err = new Error("This booking link is invalid or expired.");
     err.statusCode = 404;

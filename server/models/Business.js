@@ -187,6 +187,12 @@ const businessSchema = new mongoose.Schema(
       trim: true,
     },
 
+    isOnboarded: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+
     industry: {
       type: String,
       required: true,
@@ -311,6 +317,18 @@ const businessSchema = new mongoose.Schema(
         providerWhatsAppReminders: false,
         noShowAlerts: false,
         dailyDigest: true,
+      }),
+    },
+
+    bookingPreferences: {
+      type: {
+        minNoticeHours: { type: Number, required: true, default: 2 },
+        defaultBufferMinutes: { type: Number, required: true, default: 15 },
+      },
+      required: true,
+      default: () => ({
+        minNoticeHours: 2,
+        defaultBufferMinutes: 15,
       }),
     },
 

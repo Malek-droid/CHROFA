@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { LoadingCompleteSVG } from "@/components/ui/loading";
+import { API_BASE } from "@/lib/api";
 
 type Props = {
   mode: "login" | "signup";
@@ -41,15 +42,21 @@ export function AuthCard({ mode }: Props) {
     setFieldErrors({});
 
     if (!email.trim() || !password) {
-      setErrorMsg("Please fill in all fields.");
+      const msg = "Please fill in all fields.";
+      setErrorMsg(msg);
+      toast.error(msg);
       return;
     }
     if (!isLogin && !name.trim()) {
-      setErrorMsg("Please provide your full name.");
+      const msg = "Please provide your full name.";
+      setErrorMsg(msg);
+      toast.error(msg);
       return;
     }
     if (password.length < 8) {
-      setErrorMsg("Password must be at least 8 characters.");
+      const msg = "Password must be at least 8 characters.";
+      setErrorMsg(msg);
+      toast.error(msg);
       return;
     }
 
@@ -82,6 +89,11 @@ export function AuthCard({ mode }: Props) {
         setErrorMsg("Please fix the errors below.");
         const first = err.details[0];
         toast.error(first.message || "Please fix the errors below.");
+      } else if (err.code === "DUPLICATE_KEY" || err.status === 409) {
+        const msg = err.message || "An account with this email already exists.";
+        setFieldErrors({ email: msg });
+        setErrorMsg(msg);
+        toast.error(msg);
       } else {
         const msg = err.message || "An authentication error occurred.";
         setErrorMsg(msg);
@@ -103,15 +115,15 @@ export function AuthCard({ mode }: Props) {
   }
 
   return (
-    <div className="min-h-screen w-full grid lg:grid-cols-2 bg-background">
+    <div className="h-dvh w-full grid lg:grid-cols-2 bg-background overflow-hidden">
       {/* Form side */}
-      <div className="flex items-center justify-center px-6 py-12 sm:px-10 lg:px-16">
-        <div className="w-full max-w-md">
-          <div className="mb-10">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+      <div className="flex items-center justify-center px-4 py-4 sm:px-10 lg:px-16">
+        <div className="w-full max-w-sm sm:max-w-md" style={{ zoom: 0.85 }}>
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
               {isLogin ? "Welcome back" : "Create your account"}
             </h1>
-            <p className="mt-2 text-[15px] text-muted-foreground">
+            <p className="mt-2 text-sm sm:text-[15px] text-muted-foreground">
               {isLogin
                 ? "Sign in to continue to your dashboard."
                 : "Start scheduling smarter in minutes."}
@@ -121,7 +133,13 @@ export function AuthCard({ mode }: Props) {
           <Button
             type="button"
             variant="outline"
-            className="w-full h-11 rounded-xl border-border bg-background text-foreground font-medium hover:bg-muted transition-colors"
+            onClick={() => {
+              // Redirect to backend Google OAuth — the backend stores the referer
+              // in a cookie so the callback can redirect back to the correct port
+              const base = API_BASE.replace("/api", "");
+              window.location.href = `${base}/api/auth/google`;
+            }}
+            className="w-full h-9 sm:h-10 rounded-xl border-border bg-background text-foreground font-medium hover:bg-muted transition-colors"
           >
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -144,7 +162,7 @@ export function AuthCard({ mode }: Props) {
             Continue with Google
           </Button>
 
-          <div className="my-6 flex items-center gap-4">
+          <div className="my-4 flex items-center gap-4">
             <div className="h-px flex-1 bg-border" />
             <span className="text-xs uppercase tracking-wider text-muted-foreground">or</span>
             <div className="h-px flex-1 bg-border" />
@@ -156,9 +174,9 @@ export function AuthCard({ mode }: Props) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-3">
             {!isLogin && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="name" className="text-sm font-medium text-foreground">
                   Full name
                 </Label>
@@ -169,13 +187,13 @@ export function AuthCard({ mode }: Props) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={loading}
-                  className="h-11 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent transition-colors"
+                  className="h-10 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent transition-colors"
                 />
                 {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="email" className="text-sm font-medium text-foreground">
                 Email
               </Label>
@@ -186,12 +204,12 @@ export function AuthCard({ mode }: Props) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
-                className="h-11 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent transition-colors"
+                className="h-10 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent transition-colors"
               />
               {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="password" className="text-sm font-medium text-foreground">
                 Password
               </Label>
@@ -202,11 +220,9 @@ export function AuthCard({ mode }: Props) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                className="h-11 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent transition-colors"
+                className="h-10 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent transition-colors"
               />
-              {fieldErrors.password && (
-                <p className="text-xs text-destructive">{fieldErrors.password}</p>
-              )}
+              {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
             </div>
 
             {isLogin && (
@@ -223,7 +239,7 @@ export function AuthCard({ mode }: Props) {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors shadow-sm"
+              className="w-full h-10 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors shadow-sm"
             >
               {loading ? (
                 <>
@@ -238,7 +254,7 @@ export function AuthCard({ mode }: Props) {
             </Button>
           </form>
 
-          <p className="mt-8 text-center text-sm text-muted-foreground">
+          <p className="mt-5 text-center text-sm text-muted-foreground">
             {isLogin ? (
               <>
                 Don't have an account?{" "}

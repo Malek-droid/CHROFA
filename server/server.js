@@ -37,6 +37,7 @@ const errorHandler = require('./middleware/errorHandler');
 const { initializeEmailTransporter } = require('./services/emailService');
 const { startReminderScheduler } = require('./services/reminderScheduler');
 const { startDigestScheduler } = require('./services/digestScheduler');
+const { backfillOnboardedStatus } = require('./scripts/backfillOnboarded');
 
 // ─── CORS configuration ───────────────────────────────────────────────────────
 // ALLOWED_ORIGINS is a comma-separated list. Split and trim to produce the
@@ -94,9 +95,12 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // Stricter rate limiting for auth endpoints (relaxed for development)
+// Production: 20 attempts / 15 min — guards against brute force while allowing
+// legitimate use (password typos, multi-tab sessions, etc.).
+// Development: 100 attempts / 15 min so local testing is never blocked.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 5 : 50, // 5 in production, 50 in development
+  max: process.env.NODE_ENV === 'production' ? 20 : 100, // 20 in production, 100 in development
   message: {
     success: false,
     error: {
@@ -140,6 +144,9 @@ const PORT = parseInt(process.env.PORT || '5000', 10);
 const start = async () => {
   try {
     await connectDB();
+    // Backfill isOnboarded flag for businesses created before the field existed.
+    // Runs once at startup; idempotent — safe to run every boot.
+    await backfillOnboardedStatus();
     await connectRedis();
 
     // Initialize email service
@@ -215,4 +222,8 @@ const start = async () => {
   }
 };
 
-start();
+if (process.env.NODE_ENV !== 'test') {
+  start();
+}
+
+module.exports = app;

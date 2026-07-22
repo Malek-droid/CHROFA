@@ -33,6 +33,24 @@ router.get(
       return next(err);
     }
 
+    // Save referer origin for callback redirection
+    const referer = req.headers.referer || 'http://localhost:8080';
+    let origin = 'http://localhost:8080';
+    try {
+      origin = new URL(referer).origin;
+    } catch (e) {
+      // Fallback
+    }
+
+    res.cookie('calendar_oauth_referer', referer, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000,
+    });
+
+    const statePayload = Buffer.from(JSON.stringify({ businessId: String(businessId), origin })).toString('base64url');
+
     const oauth2Client = getOAuth2Client();
 
     const authUrl = oauth2Client.generateAuthUrl({
@@ -42,7 +60,7 @@ router.get(
         'https://www.googleapis.com/auth/calendar.events',
         'https://www.googleapis.com/auth/userinfo.email'
       ],
-      state: String(businessId)
+      state: statePayload
     });
 
     res.redirect(authUrl);
@@ -56,11 +74,37 @@ router.get(
   asyncHandler(async (req, res, next) => {
     const { code, state } = req.query;
 
-    if (!code) {
-      return res.redirect('http://localhost:8080/dashboard/settings?error=calendar_auth_failed');
+    let businessId = null;
+    let targetOrigin = 'http://localhost:8080';
+
+    if (state) {
+      try {
+        const decoded = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
+        if (decoded.businessId) businessId = decoded.businessId;
+        if (decoded.origin) targetOrigin = decoded.origin;
+      } catch (e) {
+        businessId = state; // Fallback if state is raw ObjectId
+      }
     }
 
-    const businessId = state;
+    if (!targetOrigin || targetOrigin === 'http://localhost:8080') {
+      const referer = req.cookies.calendar_oauth_referer;
+      if (referer) {
+        try {
+          targetOrigin = new URL(referer).origin;
+        } catch (e) {
+          // Fallback
+        }
+      }
+    }
+
+    // Clear the referrer cookie
+    res.clearCookie('calendar_oauth_referer');
+
+    if (!code) {
+      return res.redirect(`${targetOrigin}/dashboard/settings?error=calendar_auth_failed`);
+    }
+
     if (!businessId) {
       const err = new Error('Missing business state in callback.');
       err.statusCode = 400;
@@ -73,7 +117,7 @@ router.get(
       
       if (!tokens.refresh_token) {
         console.warn('[calendar-oauth] Warning: No refresh token returned. Prompting user for consent.');
-        return res.redirect('http://localhost:8080/dashboard/settings?error=no_refresh_token');
+        return res.redirect(`${targetOrigin}/dashboard/settings?error=no_refresh_token`);
       }
 
       oauth2Client.setCredentials(tokens);
@@ -99,10 +143,10 @@ router.get(
 
       console.log(`[calendar-oauth] Google Calendar connected successfully for business ${businessId} (${email}).`);
 
-      res.redirect('http://localhost:8080/dashboard/settings?success=calendar_connected');
+      res.redirect(`${targetOrigin}/dashboard/settings?success=calendar_connected`);
     } catch (err) {
       console.error('[calendar-oauth] Error during exchange:', err);
-      res.redirect('http://localhost:8080/dashboard/settings?error=calendar_auth_failed');
+      res.redirect(`${targetOrigin}/dashboard/settings?error=calendar_auth_failed`);
     }
   })
 );

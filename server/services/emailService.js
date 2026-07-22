@@ -501,10 +501,59 @@ async function sendWeeklyDigestEmail({ to, businessName, pastWeek, upcomingWeek 
   }
 }
 
+/**
+ * Send a test email to verify the email delivery integration is working.
+ * @param {string} to - Recipient email address.
+ * @param {string} businessName - Business name to show in the test email.
+ */
+async function sendTestEmail({ to, businessName }) {
+  if (!transporter) {
+    throw new Error('Email transporter not initialized. Check your email provider configuration.');
+  }
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; margin: 0; padding: 40px 20px; }
+    .card { background: #ffffff; border-radius: 12px; max-width: 520px; margin: 0 auto; padding: 40px; border: 1px solid #e5e7eb; }
+    .badge { display: inline-block; background: #d1fae5; color: #065f46; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; margin-bottom: 24px; }
+    h1 { margin: 0 0 12px; font-size: 22px; color: #111827; }
+    p { margin: 0 0 16px; color: #6b7280; line-height: 1.6; }
+    .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✓ Email Delivery Test</div>
+    <h1>Your email delivery is working!</h1>
+    <p>This is a test email sent from <strong>${businessName || 'your CHROFA business'}</strong>. If you received this, your email delivery integration is configured correctly.</p>
+    <p>Appointment confirmation emails, reminders, and digest reports will be sent from this same address.</p>
+    <div class="footer">
+      <p>Powered by CHROFA · This is an automated test email.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.GMAIL_USER,
+    to,
+    subject: `Email delivery test — ${businessName || 'CHROFA'}`,
+    html,
+  });
+
+  console.log('[emailService] Test email sent to:', to);
+}
+
 module.exports = {
   initializeEmailTransporter,
   sendConfirmationEmail,
   sendReminderEmail,
   sendProviderReminderEmail,
   sendWeeklyDigestEmail,
+  sendTestEmail,
 };

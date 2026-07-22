@@ -76,6 +76,22 @@ async function createAppointment({
     throw err;
   }
 
+  // ── Enforce booking preferences ───────────────────────────────────────────
+  const prefs = business.bookingPreferences || {};
+  const minNoticeHours = typeof prefs.minNoticeHours === 'number' ? prefs.minNoticeHours : 2;
+  const defaultBufferMinutes = typeof prefs.defaultBufferMinutes === 'number' ? prefs.defaultBufferMinutes : 15;
+
+  const earliestBookableMs = Date.now() + minNoticeHours * 60 * 60 * 1000;
+  if (parsedDate.getTime() < earliestBookableMs) {
+    const err = new Error(`Appointments must be booked at least ${minNoticeHours} hours in advance.`);
+    err.statusCode = 400;
+    err.code = 'MIN_NOTICE_VIOLATION';
+    throw err;
+  }
+
+  const bufferBeforeMinutes = typeof serviceObj.bufferBeforeMinutes === 'number' ? serviceObj.bufferBeforeMinutes : 0;
+  const bufferAfterMinutes = typeof serviceObj.bufferAfterMinutes === 'number' ? serviceObj.bufferAfterMinutes : defaultBufferMinutes;
+
   // ── Atomic conflict check with staff assignment ───────────────────────────
   const resolvedStaff = staffName && staffName !== 'none' ? staffName.trim() : null;
 
@@ -84,8 +100,8 @@ async function createAppointment({
     date: parsedDate,
     durationMinutes: serviceObj.durationMinutes,
     staffName: resolvedStaff,
-    bufferBeforeMinutes: serviceObj.bufferBeforeMinutes || 0,
-    bufferAfterMinutes: serviceObj.bufferAfterMinutes || 0,
+    bufferBeforeMinutes,
+    bufferAfterMinutes,
     eligibleStaffIds: serviceObj.eligibleStaffIds || [],
   });
 

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Refresh,
   AddCircle,
@@ -636,6 +636,12 @@ function OnboardingPage() {
     }
   });
 
+  // ── Draft state ────────────────────────────────────────────────────────────
+  // Tracks the MongoDB _id of an in-progress draft business created in step 1.
+  // Once set, subsequent steps PATCH this record instead of POSTing a new one.
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const draftLoadedRef = useRef(false);
+
   // ── Wizard state ───────────────────────────────────────────────────────────
   const [step, setStep] = useState(0); // 0-indexed
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -647,10 +653,60 @@ function OnboardingPage() {
     if (!loading && !user) {
       navigate({ to: "/login" });
     } else if (!loading && user && user.businessId) {
-      // Already completed onboarding — redirect away
-      navigate({ to: "/dashboard" });
+      // If the user already has a businessId we need to check if it's a draft
+      // (isOnboarded === false) before redirecting them away.
+      // The actual redirect for fully-onboarded users happens after the draft
+      // load effect below.
     }
   }, [user, loading, navigate]);
+
+  // ── Load existing draft on mount ───────────────────────────────────────────
+  useEffect(() => {
+    if (loading || !user || !user.businessId || draftLoadedRef.current) return;
+    draftLoadedRef.current = true;
+
+    apiFetch<{ success: boolean; business: any }>("/business/me")
+      .then((res) => {
+        if (!res.success || !res.business) return;
+        const biz = res.business;
+        if (biz.isOnboarded) {
+          // Already completed onboarding — redirect away
+          navigate({ to: "/dashboard" });
+          return;
+        }
+        // Pre-fill from saved draft and resume
+        setDraftId(biz._id || biz.id);
+        if (biz.name) setBusinessName(biz.name);
+        if (biz.industry) setIndustry(biz.industry as Industry);
+        if (Array.isArray(biz.services) && biz.services.length > 0) {
+          setServices(
+            biz.services.map((s: any) => ({
+              id: uid(),
+              name: s.name || "",
+              durationMinutes: String(s.durationMinutes || ""),
+              price: s.price != null ? String(s.price) : "",
+            }))
+          );
+        }
+        if (Array.isArray(biz.staff) && biz.staff.length > 0) {
+          setStaff(biz.staff.map((m: any) => ({ id: uid(), name: m.name || "" })));
+        }
+        if (Array.isArray(biz.openingHours) && biz.openingHours.length > 0) {
+          setHours(
+            biz.openingHours.map((h: any) => ({
+              day: h.day,
+              isOpen: !!h.isOpen,
+              openTime: h.openTime || "09:00",
+              closeTime: h.closeTime || "18:00",
+            }))
+          );
+        }
+        if (biz.timezone) setTimezone(biz.timezone);
+      })
+      .catch(() => {
+        // Silently ignore — user starts fresh
+      });
+  }, [loading, user, navigate]);
 
   // Load presets when industry changes (only once per industry selection)
   useEffect(() => {
@@ -716,8 +772,57 @@ function OnboardingPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!validate()) return;
+
+    // ── Draft auto-save ──────────────────────────────────────────────────────
+    // Step 0: POST a new draft business (name + industry only)
+    // Steps 1 & 2: PATCH the existing draft with services or staff
+    try {
+      if (step === 0 && !draftId) {
+        const res = await apiFetch<{ success: boolean; business: { id?: string; _id?: string } }>(
+          "/business",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              name: businessName.trim(),
+              industry,
+              draft: true,
+            }),
+          }
+        );
+        if (res.success && res.business) {
+          setDraftId((res.business.id || res.business._id) ?? null);
+        }
+      } else if (step === 0 && draftId) {
+        // Already have a draft — just PATCH the name/industry
+        await apiFetch("/business", {
+          method: "PATCH",
+          body: JSON.stringify({ name: businessName.trim(), industry }),
+        });
+      } else if (step === 1 && draftId) {
+        await apiFetch("/business", {
+          method: "PATCH",
+          body: JSON.stringify({
+            services: services.map((s) => ({
+              name: s.name.trim(),
+              durationMinutes: Number(s.durationMinutes),
+              price: s.price !== "" ? Number(s.price) : null,
+            })),
+          }),
+        });
+      } else if (step === 2 && draftId) {
+        await apiFetch("/business", {
+          method: "PATCH",
+          body: JSON.stringify({
+            staff: staff.map((m) => ({ name: m.name.trim() })),
+          }),
+        });
+      }
+    } catch {
+      // Non-fatal — draft save failures are silently ignored so the wizard keeps flowing
+    }
+
     setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
   };
 
@@ -735,26 +840,44 @@ function OnboardingPage() {
     setSubmitError(null);
 
     try {
-      await apiFetch("/business", {
-        method: "POST",
-        body: JSON.stringify({
-          name: businessName.trim(),
-          industry,
-          services: services.map((s) => ({
-            name: s.name.trim(),
-            durationMinutes: Number(s.durationMinutes),
-            price: s.price !== "" ? Number(s.price) : null,
-          })),
-          staff: staff.map((m) => ({ name: m.name.trim() })),
-          openingHours: hours.map((h) => ({
-            day: h.day,
-            isOpen: h.isOpen,
-            openTime: h.isOpen ? h.openTime : null,
-            closeTime: h.isOpen ? h.closeTime : null,
-          })),
-          timezone: timezone.trim(),
-        }),
-      });
+      if (draftId) {
+        // PATCH existing draft to finalize onboarding
+        await apiFetch("/business", {
+          method: "PATCH",
+          body: JSON.stringify({
+            openingHours: hours.map((h) => ({
+              day: h.day,
+              isOpen: h.isOpen,
+              openTime: h.isOpen ? h.openTime : null,
+              closeTime: h.isOpen ? h.closeTime : null,
+            })),
+            timezone: timezone.trim(),
+            isOnboarded: true,
+          }),
+        });
+      } else {
+        // No draft exists yet — create in one shot (fallback path)
+        await apiFetch("/business", {
+          method: "POST",
+          body: JSON.stringify({
+            name: businessName.trim(),
+            industry,
+            services: services.map((s) => ({
+              name: s.name.trim(),
+              durationMinutes: Number(s.durationMinutes),
+              price: s.price !== "" ? Number(s.price) : null,
+            })),
+            staff: staff.map((m) => ({ name: m.name.trim() })),
+            openingHours: hours.map((h) => ({
+              day: h.day,
+              isOpen: h.isOpen,
+              openTime: h.isOpen ? h.openTime : null,
+              closeTime: h.isOpen ? h.closeTime : null,
+            })),
+            timezone: timezone.trim(),
+          }),
+        });
+      }
 
       // Refresh auth context so businessId is no longer null in-memory
       await refreshUser();

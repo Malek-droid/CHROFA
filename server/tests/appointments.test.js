@@ -41,7 +41,8 @@ describe('Appointment Endpoints', () => {
     // Create a business for the user
     const business = await Business.create({
       name: 'Test Business',
-      industry: 'salon_spa',
+      industry: 'hair_salons',
+      isOnboarded: true,
       ownerId: userId,
       services: [
         { name: 'Haircut', durationMinutes: 30, price: 50 },

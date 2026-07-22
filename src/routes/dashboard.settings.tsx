@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,22 +10,74 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Calendar,
   Letter,
-  ChatRound,
-  Download,
-  QrCode,
   CheckCircle,
   Refresh,
+  Download,
+  ClockCircle,
+  CalendarMark,
 } from "@solar-icons/react";
 import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE } from "@/lib/api";
 
 export const Route = createFileRoute("/dashboard/settings")({
   head: () => ({ meta: [{ title: "Settings — CHROFA" }] }),
   component: SettingsPage,
 });
+
+// ─── IANA Timezone list (common zones) ────────────────────────────────────────
+const TIMEZONES = [
+  { value: "Pacific/Honolulu", label: "Hawaii (UTC−10)" },
+  { value: "America/Anchorage", label: "Alaska (UTC−9)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (UTC−8/−7)" },
+  { value: "America/Denver", label: "Mountain Time (UTC−7/−6)" },
+  { value: "America/Chicago", label: "Central Time (UTC−6/−5)" },
+  { value: "America/New_York", label: "Eastern Time (UTC−5/−4)" },
+  { value: "America/Halifax", label: "Atlantic Time (UTC−4/−3)" },
+  { value: "America/Sao_Paulo", label: "Brasília (UTC−3)" },
+  { value: "America/Argentina/Buenos_Aires", label: "Argentina (UTC−3)" },
+  { value: "Atlantic/Azores", label: "Azores (UTC−1)" },
+  { value: "Europe/London", label: "London (UTC+0/+1)" },
+  { value: "Europe/Paris", label: "Paris / Berlin / Rome (UTC+1/+2)" },
+  { value: "Europe/Athens", label: "Athens / Helsinki (UTC+2/+3)" },
+  { value: "Europe/Moscow", label: "Moscow (UTC+3)" },
+  { value: "Asia/Dubai", label: "Dubai (UTC+4)" },
+  { value: "Asia/Karachi", label: "Karachi (UTC+5)" },
+  { value: "Asia/Kolkata", label: "India (UTC+5:30)" },
+  { value: "Asia/Dhaka", label: "Dhaka (UTC+6)" },
+  { value: "Asia/Bangkok", label: "Bangkok / Jakarta (UTC+7)" },
+  { value: "Asia/Singapore", label: "Singapore / HK / KL (UTC+8)" },
+  { value: "Asia/Tokyo", label: "Tokyo (UTC+9)" },
+  { value: "Australia/Sydney", label: "Sydney (UTC+10/+11)" },
+  { value: "Pacific/Auckland", label: "New Zealand (UTC+12/+13)" },
+];
+
+// Day names for the schedule editor (0 = Sunday)
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+interface DayHours {
+  day: number;
+  isOpen: boolean;
+  openTime: string;
+  closeTime: string;
+}
 
 export function SettingsPage() {
   const { business, isLoading, refetch } = useBusiness();
@@ -33,7 +85,7 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Form state for business profile
+  // ── Business profile state ────────────────────────────────────────────────
   const [formData, setFormData] = useState({
     name: "",
     timezone: "",
@@ -41,14 +93,37 @@ export function SettingsPage() {
     headerTagline: "",
   });
 
-  // Form state for notification preferences
+  // ── Booking preferences state ─────────────────────────────────────────────
+  const [minNotice, setMinNotice] = useState([2]);
+  const [bufferMinutes, setBufferMinutes] = useState([15]);
+
+  // ── Schedule / opening hours state ────────────────────────────────────────
+  const [hours, setHours] = useState<DayHours[]>(
+    Array.from({ length: 7 }, (_, i) => ({
+      day: i,
+      isOpen: i >= 1 && i <= 5, // Mon–Fri open by default
+      openTime: "09:00",
+      closeTime: "18:00",
+    })),
+  );
+
+  // ── Notification preferences state ────────────────────────────────────────
   const [notificationPrefs, setNotificationPrefs] = useState({
     emailConfirmation: true,
     noShowAlerts: false,
     dailyDigest: true,
   });
 
-  // Load business data when it becomes available
+  // ── Email test modal state ─────────────────────────────────────────────────
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [testEmailTo, setTestEmailTo] = useState("");
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+
+  // ── QR code state ─────────────────────────────────────────────────────────
+  const qrImgRef = useRef<HTMLImageElement>(null);
+  const [qrError, setQrError] = useState(false);
+
+  // ── Populate form from business data ──────────────────────────────────────
   useEffect(() => {
     if (business) {
       setFormData({
@@ -64,8 +139,61 @@ export function SettingsPage() {
           dailyDigest: business.notificationPreferences.dailyDigest ?? true,
         });
       }
+      if (business.bookingPreferences) {
+        setMinNotice([business.bookingPreferences.minNoticeHours ?? 2]);
+        setBufferMinutes([business.bookingPreferences.defaultBufferMinutes ?? 15]);
+      }
+      if (business.openingHours && business.openingHours.length === 7) {
+        setHours(
+          business.openingHours.map((h: any) => ({
+            day: h.day,
+            isOpen: h.isOpen,
+            openTime: h.openTime || "09:00",
+            closeTime: h.closeTime || "18:00",
+          })),
+        );
+      }
+      // Pre-fill test email with owner's identifier if available
+      if (!testEmailTo && (business as any).ownerEmail) {
+        setTestEmailTo((business as any).ownerEmail);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("success") === "calendar_connected") {
+        toast.success("Google Calendar connected successfully!");
+        refetch();
+        window.history.replaceState({}, "", window.location.pathname);
+      } else if (params.get("error") === "calendar_auth_failed") {
+        toast.error("Google Calendar connection failed. Please try again.");
+        window.history.replaceState({}, "", window.location.pathname);
+      } else if (params.get("error") === "no_refresh_token") {
+        toast.error("Google Calendar connection requires full offline access permission.");
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
+  }, [refetch]);
+
+  const flashSaved = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2400);
+  };
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleDisconnectCalendar = async () => {
+    try {
+      await apiFetch("/calendar/disconnect", { method: "POST" });
+      toast.success("Google Calendar disconnected.");
+      await refetch();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to disconnect Google Calendar.");
+    }
+  };
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -80,18 +208,59 @@ export function SettingsPage() {
         }),
       });
       await refetch();
-      setSaved(true);
+      flashSaved();
       toast.success("Profile saved");
-      setTimeout(() => setSaved(false), 2400);
     } catch (err: any) {
-      toast.error("Failed to save profile", { description: err.message });
+      const code = err?.code;
+      if (code === "SLUG_COLLISION") {
+        toast.error("Slug already taken", {
+          description: "Please choose a different booking page URL.",
+        });
+      } else {
+        toast.error("Failed to save profile", { description: err.message });
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSaveIntegrations = async () => {
-    toast.success("Integrations saved");
+  const handleSaveBookingPrefs = async () => {
+    setSaving(true);
+    try {
+      await apiFetch("/business", {
+        method: "PATCH",
+        body: JSON.stringify({
+          bookingPreferences: {
+            minNoticeHours: minNotice[0],
+            defaultBufferMinutes: bufferMinutes[0],
+          },
+        }),
+      });
+      await refetch();
+      flashSaved();
+      toast.success("Booking preferences saved");
+    } catch (err: any) {
+      toast.error("Failed to save booking preferences", { description: err.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveSchedule = async () => {
+    setSaving(true);
+    try {
+      await apiFetch("/business", {
+        method: "PATCH",
+        body: JSON.stringify({ openingHours: hours }),
+      });
+      await refetch();
+      flashSaved();
+      toast.success("Schedule saved");
+    } catch (err: any) {
+      toast.error("Failed to save schedule", { description: err.message });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSaveNotifications = async () => {
@@ -99,14 +268,11 @@ export function SettingsPage() {
     try {
       await apiFetch("/business", {
         method: "PATCH",
-        body: JSON.stringify({
-          notificationPreferences: notificationPrefs,
-        }),
+        body: JSON.stringify({ notificationPreferences: notificationPrefs }),
       });
       await refetch();
-      setSaved(true);
+      flashSaved();
       toast.success("Notification preferences saved");
-      setTimeout(() => setSaved(false), 2400);
     } catch (err: any) {
       toast.error("Failed to save notification preferences", { description: err.message });
     } finally {
@@ -114,20 +280,119 @@ export function SettingsPage() {
     }
   };
 
-  const handleSaveBookingPage = async () => {
-    toast.success("Booking page settings saved");
+  const handleSendTestEmail = async () => {
+    setSendingTestEmail(true);
+    try {
+      await apiFetch("/business/test-email", {
+        method: "POST",
+        body: JSON.stringify({ to: testEmailTo }),
+      });
+      toast.success("Test email sent!", {
+        description: `Check your inbox at ${testEmailTo}.`,
+      });
+      setEmailModalOpen(false);
+    } catch (err: any) {
+      toast.error("Failed to send test email", { description: err.message });
+    } finally {
+      setSendingTestEmail(false);
+    }
   };
+
+  const handleDownloadQR = async () => {
+    if (!business?._id) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/business/${business._id}/qr`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to fetch QR code");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${business.slug || business._id}-qr.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error("Download failed", { description: err.message });
+    }
+  };
+
+  const updateHour = (day: number, field: keyof DayHours, value: string | boolean) => {
+    setHours((prev) => prev.map((h) => (h.day === day ? { ...h, [field]: value } : h)));
+  };
+
+  // Build the QR code URL for display (it's a public endpoint, no auth needed)
+  const qrSrc = business?._id ? `/api/business/${business._id}/qr` : null;
+  const bookingUrl = business
+    ? `${window.location.origin}/book/${business.slug || business._id}`
+    : "";
+
+  // Ensure current timezone is always in the list
+  const timezoneOptions = [...TIMEZONES];
+  if (formData.timezone && !timezoneOptions.some((t) => t.value === formData.timezone)) {
+    timezoneOptions.unshift({ value: formData.timezone, label: formData.timezone });
+  }
 
   return (
     <DashboardShell title="Settings" description="Manage how CHROFA works for you.">
+      {/* Test email dialog */}
+      <Dialog open={emailModalOpen} onOpenChange={setEmailModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send test email</DialogTitle>
+            <DialogDescription>
+              Verify that appointment confirmations, reminders, and digests are delivered correctly
+              by sending a test message.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label
+              htmlFor="test-email-to"
+              className="text-xs uppercase tracking-wide text-muted-foreground"
+            >
+              Recipient email
+            </Label>
+            <Input
+              id="test-email-to"
+              type="email"
+              value={testEmailTo}
+              onChange={(e) => setTestEmailTo(e.target.value)}
+              placeholder="you@example.com"
+              className="bg-background"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEmailModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-brand-ink hover:bg-brand-ink/90"
+              onClick={handleSendTestEmail}
+              disabled={sendingTestEmail || !testEmailTo}
+            >
+              {sendingTestEmail ? (
+                <>
+                  <Refresh className="mr-2 h-4 w-4 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                "Send test email"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="profile">Business profile</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="booking">Booking page</TabsTrigger>
+          <TabsTrigger value="schedule">Schedule</TabsTrigger>
         </TabsList>
 
+        {/* ── Business Profile tab ─────────────────────────────────────────── */}
         <TabsContent value="profile" className="space-y-6">
           <section className="card-soft p-6">
             <h2 className="font-display text-lg text-foreground">Business profile</h2>
@@ -149,16 +414,28 @@ export function SettingsPage() {
                     className="mt-1.5 bg-background"
                   />
                 </div>
+
                 <div>
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                     Time zone
                   </Label>
-                  <Input
+                  <Select
                     value={formData.timezone}
-                    onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                    className="mt-1.5 bg-background"
-                  />
+                    onValueChange={(v) => setFormData({ ...formData, timezone: v })}
+                  >
+                    <SelectTrigger className="mt-1.5 bg-background">
+                      <SelectValue placeholder="Select timezone…" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {timezoneOptions.map((tz) => (
+                        <SelectItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
                 <div>
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                     Public slug
@@ -169,7 +446,12 @@ export function SettingsPage() {
                     className="mt-1.5 bg-background"
                     placeholder="studio-fillmore"
                   />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Your booking link: /book/
+                    <span className="font-mono">{formData.slug || "your-slug"}</span>
+                  </p>
                 </div>
+
                 <div>
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                     Header tagline
@@ -178,7 +460,7 @@ export function SettingsPage() {
                     value={formData.headerTagline}
                     onChange={(e) => setFormData({ ...formData, headerTagline: e.target.value })}
                     className="mt-1.5 bg-background"
-                    placeholder="Book time with CHROFA"
+                    placeholder="Book time with us"
                   />
                 </div>
               </div>
@@ -197,7 +479,7 @@ export function SettingsPage() {
                 {saving ? (
                   <>
                     <Refresh className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    Saving…
                   </>
                 ) : (
                   "Save changes"
@@ -206,6 +488,7 @@ export function SettingsPage() {
             </div>
           </section>
 
+          {/* QR code section */}
           <section className="card-soft p-6">
             <h2 className="font-display text-lg text-foreground">Booking QR code</h2>
             <p className="text-sm text-muted-foreground">Print or share for direct bookings.</p>
@@ -213,9 +496,21 @@ export function SettingsPage() {
             <div className="grid sm:grid-cols-[220px_1fr] gap-6 items-center">
               <div className="rounded-2xl border border-border bg-muted/30 p-5 flex items-center justify-center">
                 <div className="rounded-xl bg-white p-4 shadow-soft">
-                  <div className="grid h-40 w-40 place-items-center">
-                    <QrCode className="h-32 w-32 text-brand-ink" />
-                  </div>
+                  {qrSrc && !qrError ? (
+                    <img
+                      ref={qrImgRef}
+                      src={qrSrc}
+                      alt="Booking QR code"
+                      className="h-40 w-40 object-contain"
+                      onError={() => setQrError(true)}
+                    />
+                  ) : (
+                    <div className="grid h-40 w-40 place-items-center text-muted-foreground text-xs text-center">
+                      {qrError
+                        ? "Could not load QR code.\nMake sure the server is running."
+                        : "QR code loading\u2026"}
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
@@ -223,10 +518,15 @@ export function SettingsPage() {
                   Print this QR code and place it at reception, on business cards, or on receipts.
                   Guests scan to open your booking page directly.
                 </p>
-                <p className="text-xs text-muted-foreground mt-2">chrofa.co/book/studio-fillmore</p>
+                {bookingUrl && (
+                  <p className="text-xs text-muted-foreground mt-2 font-mono break-all">
+                    {bookingUrl}
+                  </p>
+                )}
                 <Button
                   className="mt-4 bg-brand-ink hover:bg-brand-ink/90"
-                  onClick={() => toast.success("QR code downloaded")}
+                  onClick={handleDownloadQR}
+                  disabled={!business?._id}
                 >
                   <Download className="h-4 w-4 mr-2" /> Download QR
                 </Button>
@@ -235,20 +535,32 @@ export function SettingsPage() {
           </section>
         </TabsContent>
 
+        {/* ── Integrations tab ─────────────────────────────────────────────── */}
         <TabsContent value="integrations" className="space-y-4">
           <section className="card-soft divide-y divide-border">
             <IntegrationRow
               icon={Calendar}
               title="Google Calendar"
               description="Sync appointments to your calendar in real time."
-              status="disconnected"
+              status={business?.googleCalendarConnected ? "connected" : "disconnected"}
+              detail={
+                business?.googleCalendarConnected && business?.googleCalendarConnectedEmail
+                  ? `Connected as ${business.googleCalendarConnectedEmail}`
+                  : undefined
+              }
+              onConnect={() => {
+                const base = API_BASE.replace("/api", "");
+                window.location.href = `${base}/api/calendar/connect`;
+              }}
+              onDisconnect={handleDisconnectCalendar}
             />
             <IntegrationRow
               icon={Letter}
               title="Email delivery"
               description="Send confirmations and reminders via email."
               status="connected"
-              detail="hello@chrofa.co"
+              detail="Configured via SMTP / Gmail"
+              onManage={() => setEmailModalOpen(true)}
             />
           </section>
 
@@ -256,26 +568,89 @@ export function SettingsPage() {
             <h2 className="font-display text-lg text-foreground">Booking preferences</h2>
             <p className="text-sm text-muted-foreground">Fine-tune how bookings are accepted.</p>
             <Separator className="my-5" />
-            <div className="space-y-6">
-              <SliderRow label="Minimum notice" min="Same day" max="14 days" defaultValue={2} />
-              <SliderRow
-                label="Buffer between appointments"
-                min="0 min"
-                max="60 min"
-                defaultValue={15}
-              />
+            <div className="space-y-8">
+              <div>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="flex items-center gap-1.5 text-foreground font-medium">
+                    <ClockCircle className="h-4 w-4 text-muted-foreground" />
+                    Minimum notice
+                  </span>
+                  <span className="text-muted-foreground font-mono">
+                    {minNotice[0] === 0 ? "Same day" : `${minNotice[0]}h`}
+                  </span>
+                </div>
+                <Slider
+                  value={minNotice}
+                  onValueChange={setMinNotice}
+                  min={0}
+                  max={72}
+                  step={1}
+                  className="mt-2"
+                />
+                <div className="flex justify-between text-[11px] text-muted-foreground mt-1.5">
+                  <span>Same day</span>
+                  <span>72 hours</span>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Customers won't be able to book slots less than{" "}
+                  {minNotice[0] === 0
+                    ? "the current time"
+                    : `${minNotice[0]} hour${minNotice[0] !== 1 ? "s" : ""}`}{" "}
+                  from now.
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="flex items-center gap-1.5 text-foreground font-medium">
+                    <CalendarMark className="h-4 w-4 text-muted-foreground" />
+                    Buffer between appointments
+                  </span>
+                  <span className="text-muted-foreground font-mono">{bufferMinutes[0]}min</span>
+                </div>
+                <Slider
+                  value={bufferMinutes}
+                  onValueChange={setBufferMinutes}
+                  min={0}
+                  max={60}
+                  step={5}
+                  className="mt-2"
+                />
+                <div className="flex justify-between text-[11px] text-muted-foreground mt-1.5">
+                  <span>No buffer</span>
+                  <span>60 min</span>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  A gap applied after each appointment so you have time to prepare for the next.
+                  Applied as a fallback when a service has no specific buffer configured.
+                </p>
+              </div>
             </div>
             <div className="mt-6 flex items-center justify-end gap-3">
+              {saved && (
+                <span className="inline-flex items-center gap-1.5 text-sm text-status-confirmed-fg animate-fade-in">
+                  <CheckCircle className="h-4 w-4" /> Saved
+                </span>
+              )}
               <Button
                 className="bg-brand-ink hover:bg-brand-ink/90"
-                onClick={handleSaveIntegrations}
+                onClick={handleSaveBookingPrefs}
+                disabled={saving}
               >
-                Save changes
+                {saving ? (
+                  <>
+                    <Refresh className="mr-2 h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  "Save changes"
+                )}
               </Button>
             </div>
           </section>
         </TabsContent>
 
+        {/* ── Notifications tab ────────────────────────────────────────────── */}
         <TabsContent value="notifications" className="space-y-4">
           <section className="card-soft p-6 divide-y divide-border">
             <ToggleRow
@@ -317,7 +692,7 @@ export function SettingsPage() {
               {saving ? (
                 <>
                   <Refresh className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  Saving…
                 </>
               ) : (
                 "Save changes"
@@ -326,21 +701,85 @@ export function SettingsPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="booking" className="space-y-4">
+        {/* ── Schedule tab ─────────────────────────────────────────────────── */}
+        <TabsContent value="schedule" className="space-y-4">
           <section className="card-soft p-6">
-            <h2 className="font-display text-lg text-foreground">Booking page</h2>
-            <p className="text-sm text-muted-foreground">The page your guests see.</p>
+            <h2 className="font-display text-lg text-foreground">Business hours</h2>
+            <p className="text-sm text-muted-foreground">
+              Set when you're open each day. The availability engine uses these hours to calculate
+              bookable slots.
+            </p>
             <Separator className="my-5" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Public slug" defaultValue="studio-fillmore" />
-              <Field label="Header tagline" defaultValue="Book time with CHROFA" />
+            <div className="space-y-2 rounded-lg border border-border bg-card/50 p-4">
+              {hours.map((h) => (
+                <div key={h.day} className="flex items-center gap-3 py-1.5">
+                  <div className="w-24 shrink-0">
+                    <span className="text-sm font-medium text-foreground">{DAY_NAMES[h.day]}</span>
+                  </div>
+
+                  {/* Open/closed toggle */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={h.isOpen}
+                    onClick={() => updateHour(h.day, "isOpen", !h.isOpen)}
+                    className={[
+                      "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
+                      h.isOpen ? "bg-primary" : "bg-input",
+                    ].join(" ")}
+                    aria-label={`${DAY_NAMES[h.day]} open/closed`}
+                  >
+                    <span
+                      className={[
+                        "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                        h.isOpen ? "translate-x-4" : "translate-x-0",
+                      ].join(" ")}
+                    />
+                  </button>
+
+                  {h.isOpen ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="time"
+                        value={h.openTime}
+                        onChange={(e) => updateHour(h.day, "openTime", e.target.value)}
+                        className="h-8 w-28 text-sm bg-background"
+                        aria-label={`${DAY_NAMES[h.day]} opening time`}
+                      />
+                      <span className="text-xs text-muted-foreground">to</span>
+                      <Input
+                        type="time"
+                        value={h.closeTime}
+                        onChange={(e) => updateHour(h.day, "closeTime", e.target.value)}
+                        className="h-8 w-28 text-sm bg-background"
+                        aria-label={`${DAY_NAMES[h.day]} closing time`}
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Closed</span>
+                  )}
+                </div>
+              ))}
             </div>
             <div className="mt-6 flex items-center justify-end gap-3">
+              {saved && (
+                <span className="inline-flex items-center gap-1.5 text-sm text-status-confirmed-fg animate-fade-in">
+                  <CheckCircle className="h-4 w-4" /> Saved
+                </span>
+              )}
               <Button
                 className="bg-brand-ink hover:bg-brand-ink/90"
-                onClick={handleSaveBookingPage}
+                onClick={handleSaveSchedule}
+                disabled={saving}
               >
-                Save changes
+                {saving ? (
+                  <>
+                    <Refresh className="mr-2 h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  "Save schedule"
+                )}
               </Button>
             </div>
           </section>
@@ -350,14 +789,7 @@ export function SettingsPage() {
   );
 }
 
-function Field({ label, defaultValue }: { label: string; defaultValue?: string }) {
-  return (
-    <div>
-      <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
-      <Input defaultValue={defaultValue} className="mt-1.5 bg-background" />
-    </div>
-  );
-}
+// ─── Integration row ──────────────────────────────────────────────────────────
 
 function IntegrationRow({
   icon: Icon,
@@ -365,12 +797,18 @@ function IntegrationRow({
   description,
   status,
   detail,
+  onConnect,
+  onDisconnect,
+  onManage,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
   status: "connected" | "disconnected" | "syncing";
   detail?: string;
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onManage?: () => void;
 }) {
   const statusMap = {
     connected: {
@@ -408,45 +846,24 @@ function IntegrationRow({
         <Button
           variant="outline"
           className="border-brand-ink text-brand-ink hover:bg-brand-ink/10 hover:text-brand-ink"
-          onClick={() => toast.info("Coming soon — hook up your real provider later.")}
+          onClick={onConnect ?? (() => toast.info("Coming soon — hook up your real provider later."))}
         >
           Connect
         </Button>
       ) : (
-        <Button variant="ghost" onClick={() => toast.info("Manage flow coming soon")}>
-          Manage
+        <Button
+          variant={onDisconnect ? "outline" : "ghost"}
+          className={onDisconnect ? "text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/10" : undefined}
+          onClick={onDisconnect ?? onManage ?? (() => toast.info("Manage flow coming soon"))}
+        >
+          {onDisconnect ? "Disconnect" : "Manage"}
         </Button>
       )}
     </div>
   );
 }
 
-function SliderRow({
-  label,
-  min,
-  max,
-  defaultValue,
-}: {
-  label: string;
-  min: string;
-  max: string;
-  defaultValue: number;
-}) {
-  const [value, setValue] = useState([defaultValue]);
-  return (
-    <div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-foreground">{label}</span>
-        <span className="text-muted-foreground">{value[0]}</span>
-      </div>
-      <Slider value={value} onValueChange={setValue} max={60} step={1} className="mt-3" />
-      <div className="flex justify-between text-[11px] text-muted-foreground mt-1.5">
-        <span>{min}</span>
-        <span>{max}</span>
-      </div>
-    </div>
-  );
-}
+// ─── Toggle row ───────────────────────────────────────────────────────────────
 
 function ToggleRow({
   title,
@@ -466,7 +883,6 @@ function ToggleRow({
     onCheckedChange?.(newChecked);
   };
 
-  // Sync local state when prop changes
   useEffect(() => {
     setLocalChecked(checked ?? false);
   }, [checked]);

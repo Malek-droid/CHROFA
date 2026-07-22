@@ -27,6 +27,8 @@ export type BusinessStaff = {
 /** Subset of Business fields needed by dashboard consumers. */
 export type Business = {
   _id: string;
+  /** Convenience alias — equals _id */
+  id?: string;
   name: string;
   industry: string;
   timezone: string;
@@ -34,6 +36,16 @@ export type Business = {
   headerTagline?: string | null;
   services: BusinessService[];
   staff: BusinessStaff[];
+  openingHours?: Array<{
+    day: number;
+    isOpen: boolean;
+    openTime: string;
+    closeTime: string;
+  }>;
+  bookingPreferences?: {
+    minNoticeHours: number;
+    defaultBufferMinutes: number;
+  };
   googleCalendarConnected?: boolean;
   googleCalendarConnectedEmail?: string | null;
   notificationPreferences?: {

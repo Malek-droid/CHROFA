@@ -22,15 +22,36 @@ router.get('/me', requireAuth, asyncHandler(authController.me));
 // Google OAuth routes
 router.get(
   '/google',
+  (req, res, next) => {
+    // Save the originating frontend host/port in a cookie so callback redirects back to it dynamically
+    const referer = req.headers.referer || 'http://localhost:8080';
+    res.cookie('oauth_referer', referer, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000, // 10 minutes
+    });
+    next();
+  },
   passport.authenticate('google', { scope: ['profile', 'email'], session: false })
 );
 
 router.get(
   '/google/callback',
-  passport.authenticate('google', {
-    session: false,
-    failureRedirect: 'http://localhost:8080/login?error=google_auth_failed',
-  }),
+  (req, res, next) => {
+    const referer = req.cookies.oauth_referer || 'http://localhost:8080';
+    let targetOrigin = 'http://localhost:8080';
+    try {
+      targetOrigin = new URL(referer).origin;
+    } catch (e) {
+      // Fallback if referer is invalid URL
+    }
+    const failureRedirect = `${targetOrigin}/login?error=google_auth_failed`;
+    passport.authenticate('google', {
+      session: false,
+      failureRedirect,
+    })(req, res, next);
+  },
   asyncHandler(async (req, res) => {
     // Generate JWT tokens
     const accessToken = authController.signAccessToken(req.user._id, req.user.role);
@@ -49,8 +70,20 @@ router.get(
     authController.sendAccessTokenCookie(res, accessToken);
     authController.sendRefreshTokenCookie(res, refreshToken);
     
+    // Retrieve target redirect origin
+    const referer = req.cookies.oauth_referer || 'http://localhost:8080';
+    let targetOrigin = 'http://localhost:8080';
+    try {
+      targetOrigin = new URL(referer).origin;
+    } catch (e) {
+      // Fallback
+    }
+
+    // Clear temporary referer cookie
+    res.clearCookie('oauth_referer');
+
     // Redirect to frontend dashboard
-    res.redirect('http://localhost:8080/dashboard');
+    res.redirect(`${targetOrigin}/dashboard`);
   })
 );
 

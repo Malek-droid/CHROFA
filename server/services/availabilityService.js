@@ -228,6 +228,18 @@ async function getAvailableSlots({ businessId, dateStr, serviceId, staffName }) 
   const openMin = openH * 60 + openM;
   const closeMin = closeH * 60 + closeM;
 
+  // ── Booking preferences ─────────────────────────────────────────────────────
+  const prefs = business.bookingPreferences || {};
+  const minNoticeHours = typeof prefs.minNoticeHours === 'number' ? prefs.minNoticeHours : 2;
+  const defaultBufferMinutes = typeof prefs.defaultBufferMinutes === 'number' ? prefs.defaultBufferMinutes : 15;
+
+  // Earliest bookable moment: now + minNoticeHours
+  const earliestBookableMs = Date.now() + minNoticeHours * 60 * 60 * 1000;
+
+  // Buffer minutes to use for this service (fall back to business default)
+  const bufferBeforeMinutes = typeof service.bufferBeforeMinutes === 'number' ? service.bufferBeforeMinutes : 0;
+  const bufferAfterMinutes = typeof service.bufferAfterMinutes === 'number' ? service.bufferAfterMinutes : defaultBufferMinutes;
+
   const availableSlots = [];
 
   for (let hour = 0; hour < 24; hour++) {
@@ -238,12 +250,19 @@ async function getAvailableSlots({ businessId, dateStr, serviceId, staffName }) 
       if (slotStartMin >= openMin && slotEndMin <= closeMin) {
         const timeStr = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
         const slotDate = getLocalDateInTimezone(dateStr, timeStr, business.timezone);
-        
+
+        // ── Skip slots that are too soon (minimum notice check) ──────────────
+        if (slotDate.getTime() < earliestBookableMs) {
+          continue;
+        }
+
         const { available } = await isSlotAvailable({
           businessId,
           date: slotDate,
           durationMinutes,
-          staffName
+          staffName,
+          bufferBeforeMinutes,
+          bufferAfterMinutes,
         });
 
         if (available) {

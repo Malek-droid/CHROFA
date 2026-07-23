@@ -670,6 +670,9 @@ function OnboardingPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Tracks in-flight draft PATCH so the Next button can be disabled and
+  // navigation is blocked until the save either succeeds or surfaces an error.
+  const [savePending, setSavePending] = useState(false);
 
   // ── Guards ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -802,6 +805,7 @@ function OnboardingPage() {
     // ── Draft auto-save ──────────────────────────────────────────────────────
     // Step 0: POST a new draft business (name + industry only)
     // Steps 1 & 2: PATCH the existing draft with services or staff
+    setSavePending(true);
     try {
       if (step === 0 && !draftId) {
         const res = await apiFetch<{ success: boolean; business: { id?: string; _id?: string } }>(
@@ -844,9 +848,18 @@ function OnboardingPage() {
           }),
         });
       }
-    } catch {
-      // Non-fatal — draft save failures are silently ignored so the wizard keeps flowing
+    } catch (err: any) {
+      // Draft save failed — surface a visible error and BLOCK navigation.
+      // The user's in-progress form state is preserved so they can retry
+      // without losing their data.
+      const msg =
+        err?.message ||
+        "Couldn't save your progress. Check your connection and try again.";
+      toast.error("Save failed", { description: msg });
+      setSavePending(false);
+      return; // ← CRITICAL: do not advance to the next step on failure
     }
+    setSavePending(false);
 
     setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
   };
@@ -1015,11 +1028,20 @@ function OnboardingPage() {
                 <Button
                   type="button"
                   onClick={handleNext}
-                  disabled={submitting}
+                  disabled={submitting || savePending}
                   className="gap-1.5"
                 >
-                  Next
-                  <AltArrowRight className="h-4 w-4" />
+                  {savePending ? (
+                    <>
+                      <Refresh className="h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      Next
+                      <AltArrowRight className="h-4 w-4" />
+                    </>
+                  )}
                 </Button>
               ) : (
                 <Button

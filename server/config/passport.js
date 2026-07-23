@@ -34,9 +34,12 @@ passport.use(
         } else {
           // If a User exists with that email
           if (user.authProvider === 'local' && !user.googleId) {
-            // ATTACH googleId to that existing document (do not change authProvider away from 'local')
-            user.googleId = googleId;
-            await user.save();
+            // A password-protected local account already owns this email.
+            // Silently attaching googleId here would let anyone who controls
+            // that Google inbox bypass the original account's password.
+            // Reject the OAuth attempt and redirect the user to log in with
+            // their existing password instead.
+            return done(null, false, { message: 'account_exists_local' });
           } else if (user.googleId && user.googleId !== googleId) {
             // Edge case: if a User exists but the incoming Google googleId differs from the stored one
             console.warn(

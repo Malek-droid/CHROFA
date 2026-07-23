@@ -32,6 +32,10 @@ export function AuthCard({ mode }: Props) {
       const params = new URLSearchParams(window.location.search);
       if (params.get("error") === "google_auth_failed") {
         setErrorMsg("Google authentication failed. Please try again.");
+      } else if (params.get("error") === "account_exists_local") {
+        setErrorMsg(
+          "An account with this email already exists. Sign in with your password to continue."
+        );
       }
     }
   }, [isLogin]);

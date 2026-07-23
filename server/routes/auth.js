@@ -46,10 +46,25 @@ router.get(
     } catch (e) {
       // Fallback if referer is invalid URL
     }
-    const failureRedirect = `${targetOrigin}/login?error=google_auth_failed`;
-    passport.authenticate('google', {
-      session: false,
-      failureRedirect,
+
+    // Use a custom callback so we can inspect the rejection `info` from the
+    // passport strategy and redirect to the correct error param.
+    // - done(null, false, { message: 'account_exists_local' }) → ?error=account_exists_local
+    // - done(err) or done(null, false, other) → ?error=google_auth_failed
+    passport.authenticate('google', { session: false }, (err, user, info) => {
+      if (err) {
+        return res.redirect(`${targetOrigin}/login?error=google_auth_failed`);
+      }
+      if (!user) {
+        const errorParam =
+          info && info.message === 'account_exists_local'
+            ? 'account_exists_local'
+            : 'google_auth_failed';
+        return res.redirect(`${targetOrigin}/login?error=${errorParam}`);
+      }
+      // Attach user so the next asyncHandler can read req.user
+      req.user = user;
+      next();
     })(req, res, next);
   },
   asyncHandler(async (req, res) => {

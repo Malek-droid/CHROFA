@@ -254,7 +254,8 @@ async function getAIResponse({ messages, businessContext }) {
 
     parsed = JSON.parse(cleaned);
   } catch (parseErr) {
-    console.error("[aiBookingService] Failed to parse LLM JSON:", rawResponse);
+    console.error("[aiBookingService] Failed to parse LLM JSON. Raw output was:", JSON.stringify(rawResponse));
+    console.error("[aiBookingService] Parse error stack:", parseErr);
     return { ...FALLBACK_RESPONSE };
   }
 

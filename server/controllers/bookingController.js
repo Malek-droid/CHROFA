@@ -268,6 +268,36 @@ exports.chat = async (req, res, next) => {
           business.timezone,
         );
 
+        // ── Reject past-date bookings ────────────────────────────────────────
+        // Same 60-second grace window as the confirm handler. Chat always returns
+        // HTTP 200, so on a past-date we return success:false with an AI-framed
+        // message rather than a 4xx — consistent with the CONFLICT pattern below.
+        const GRACE_MS = 60 * 1000;
+        if (slotDate.getTime() < Date.now() - GRACE_MS) {
+          const pastDateMessage = [
+            ...messages,
+            {
+              role: "assistant",
+              content: JSON.stringify(aiResponse),
+            },
+            {
+              role: "system",
+              content: `BOOKING FAILED: The requested slot (${mergedExtracted.date} at ${mergedExtracted.timePreference}) is in the past and cannot be booked. Please apologise to the customer and ask them to choose a future date and time.`,
+            },
+          ];
+
+          const pastDateResponse = await getAIResponse({
+            messages: pastDateMessage,
+            businessContext,
+          });
+          pastDateResponse.extracted = mergeExtractions(pastDateResponse.extracted, mergedExtracted);
+
+          return res.status(200).json({
+            success: false,
+            response: pastDateResponse,
+          });
+        }
+
         // Execute the shared appointment creation logic
         const appointment = await createAppointment({
           businessId: business._id.toString(),
@@ -446,6 +476,18 @@ exports.confirm = async (req, res, next) => {
     time.trim(),
     business.timezone,
   );
+
+  // ── Reject past-date bookings ──────────────────────────────────────────────
+  // 60-second grace window: allow slots that were valid at click-time but whose
+  // request arrived marginally late due to network latency. Anything more than
+  // 60s in the past is definitionally a past booking, not a race condition.
+  const GRACE_MS = 60 * 1000;
+  if (slotDate.getTime() < Date.now() - GRACE_MS) {
+    const err = new Error("Cannot book a slot in the past.");
+    err.statusCode = 400;
+    err.code = "PAST_DATE";
+    return next(err);
+  }
 
   try {
     const appointment = await createAppointment({

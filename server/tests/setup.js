@@ -1,5 +1,7 @@
 'use strict';
 
+process.env.NODE_ENV = 'test';
+
 jest.mock('@whiskeysockets/baileys', () => {
   return {
     makeWASocket: jest.fn(() => ({

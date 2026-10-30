@@ -36,8 +36,6 @@ const refreshTokenSchema = new mongoose.Schema(
   }
 );
 
-// TTL index for automatic cleanup of expired tokens
-refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const RefreshToken = mongoose.model('RefreshToken', refreshTokenSchema);
 

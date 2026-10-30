@@ -229,6 +229,10 @@ function initWorker() {
       concurrency: 1, // Single concurrency guarantees serialized appointment writes
     });
 
+    worker.on("error", (err) => {
+      console.error("[calendar-worker] BullMQ Worker error:", err.message);
+    });
+
     worker.on("completed", (job) => {
       console.log(`[calendar-worker] Job completed: ${job.id}`);
     });

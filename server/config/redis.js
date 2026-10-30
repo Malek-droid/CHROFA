@@ -8,6 +8,7 @@ const Redis = require('ioredis');
 // We do NOT create any BullMQ Queue or Worker instances here — this file is
 // purely connection scaffolding.
 let redisClient = null;
+let isReady = false;
 
 const MAX_RETRIES = 5;
 
@@ -49,6 +50,7 @@ const connectRedis = () => {
     });
 
     client.on('ready', () => {
+      isReady = true;
       console.log('[redis] Redis connection ready.');
       resolve();
     });
@@ -58,10 +60,12 @@ const connectRedis = () => {
     });
 
     client.on('close', () => {
+      isReady = false;
       console.warn('[redis] Redis connection closed.');
     });
 
     client.on('end', () => {
+      isReady = false;
       console.warn('[redis] Redis client ended (max retries exhausted or manually closed).');
     });
 
@@ -91,4 +95,6 @@ const getRedisClient = () => {
   return redisClient;
 };
 
-module.exports = { connectRedis, getRedisClient };
+const isRedisReady = () => isReady;
+
+module.exports = { connectRedis, getRedisClient, isRedisReady };

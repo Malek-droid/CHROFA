@@ -1,7 +1,7 @@
 'use strict';
 
 const { Queue } = require('bullmq');
-const { getRedisClient } = require('../config/redis');
+const { getRedisClient, isRedisReady } = require('../config/redis');
 
 let queue = null;
 
@@ -34,6 +34,10 @@ function getQueue() {
  */
 async function addSyncJob(type, data) {
   try {
+    if (!isRedisReady()) {
+      console.warn('[calendar-queue] Redis is not reachable; skipping calendar sync job.');
+      return;
+    }
     const q = getQueue();
     const identifier = data.appointmentId || data.googleEventId;
     const jobName = `${type}-${identifier}`;

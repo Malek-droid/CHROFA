@@ -3,8 +3,9 @@
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
+const path = require('path');
 const dotenv = require('dotenv');
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 // ─── Fail-fast env validation ─────────────────────────────────────────────────
 // Enumerate every required variable. Missing any of these at boot means the
@@ -158,9 +159,14 @@ const start = async () => {
     // Start weekly digest scheduler (runs every Monday at 8:00 AM UTC)
     startDigestScheduler();
 
-    // Start BullMQ calendar sync worker
+    // Start BullMQ calendar sync worker if Redis is connected
     const { initWorker } = require('./workers/calendarSyncWorker');
-    initWorker();
+    const { isRedisReady } = require('./config/redis');
+    if (isRedisReady()) {
+      initWorker();
+    } else {
+      console.warn('[calendar-worker] Redis is not reachable; BullMQ calendar sync worker paused.');
+    }
 
     const server = app.listen(PORT, () => {
       console.log(
